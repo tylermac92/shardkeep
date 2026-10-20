@@ -1,0 +1,28 @@
+name: CI
+
+on: push
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: pipx install check-jsonschema==0.38.2
+      - name: JSON Schema check
+        run: tools/validate_content.sh
+      - name: Engine purity lint
+        run: tools/lint_engine.sh
+      - name: Lint self-checks
+        run: tools/test_lints.sh
+
+  godot:
+    runs-on: ubuntu-24.04
+    container: barichello/godot-ci:4.7.2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Import project
+        run: godot --headless --import
+      - name: content_lint.gd
+        run: godot --headless --script res://tools/content_lint.gd
+      - name: GUT
+        run: godot --headless -s addons/gut/gut_cmdln.gd
