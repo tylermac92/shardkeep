@@ -1,0 +1,11 @@
+{
+  "gems": [
+    { "id": "red", "spawn_weight": 16, "reward": "mana", "amount": 1 },
+    { "id": "blue", "spawn_weight": 16, "reward": "mana", "amount": 1 },
+    { "id": "green", "spawn_weight": 16, "reward": "mana", "amount": 1 },
+    { "id": "yellow", "spawn_weight": 16, "reward": "mana", "amount": 1 },
+    { "id": "skull", "spawn_weight": 12, "reward": "damage", "amount": 1 },
+    { "id": "action", "spawn_weight": 12, "reward": "ap", "amount": 1 },
+    { "id": "gold", "spawn_weight": 12, "reward": "gold", "amount": 1 }
+  ]
+}
