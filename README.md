@@ -33,4 +33,18 @@ tools/validate_content.sh                              # JSON Schema (pipx insta
 tools/lint_engine.sh                                   # engine purity lint
 tools/test_lints.sh                                    # proves the two lints above catch bad input
 godot --headless --script res://tools/benchmark.gd -- --positions 200  # AI decision time per level
+godot --headless --script res://tools/fuzz.gd -- --actions 10000       # AI-vs-AI invariant checks (own CI job)
 ```
+
+## Replays
+
+In a debug build, F9 on the battle screen saves the battle so far (seed, loadouts, every action and
+a state hash after each) to `user://replays/`. Replay one headless with
+
+```sh
+godot --headless --script res://tools/replay.gd -- path/to/battle.json          # prints the final state hash
+godot --headless --script res://tools/replay.gd -- path/to/battle.json --write  # re-record after an intended rule change
+```
+
+`tests/replays/` holds the fixtures CI replays; a failing fuzz run writes its battle in the same
+format (CI uploads it as the `fuzz-failure` artifact).

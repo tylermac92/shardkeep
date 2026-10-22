@@ -9,6 +9,8 @@ signal action_applied(side: int, action: Action)
 signal settled
 
 const LOADOUTS := ["loadout_a", "loadout_b"]
+const EXPORT_KEY := KEY_F9
+const EXPORT_DIR := "user://replays"
 
 var state: BattleState
 var level := AI.Level.NORMAL
@@ -28,6 +30,8 @@ var _message := Label.new()
 var _overlay := PanelContainer.new()
 var _result := Label.new()
 var _speed_buttons: Array[Button] = []
+var _seed := 0
+var _history: Array[Action] = []  # every action this battle, both sides, for replay export
 
 
 func _ready() -> void:
@@ -91,6 +95,8 @@ func start_battle(battle_seed: int, ai_level: AI.Level) -> void:
 	_battle += 1
 	if battle_seed < 0:
 		battle_seed = randi()
+	_seed = battle_seed
+	_history.clear()
 	state = Rules.new_battle(battle_seed, content, LOADOUTS)
 	_seed_label.text = "Seed %d    %s" % [battle_seed, AI.Level.keys()[level].capitalize()]
 	_overlay.hide()
@@ -98,6 +104,28 @@ func start_battle(battle_seed: int, ai_level: AI.Level) -> void:
 	board_view.show_board(state.board)
 	_refresh()
 	_next()
+
+
+## Writes this battle so far (seed, loadouts, actions, state hashes) to a JSON file that
+## tools/replay.gd replays. Returns its path, or "" if it couldn't be written.
+func export_replay() -> String:
+	if state == null:
+		return ""
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(EXPORT_DIR))
+	var path := EXPORT_DIR.path_join("battle_%d_%d.json" % [_seed, _history.size()])
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		return ""
+	f.store_string(Replay.to_json(Replay.record(_seed, LOADOUTS, _history, content)))
+	return path
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if key and key.pressed and not key.echo and key.keycode == EXPORT_KEY and OS.is_debug_build():
+		var path := export_replay()
+		_message.text = "Replay saved to " + ProjectSettings.globalize_path(path) if path else "Couldn't save the replay"
+		get_viewport().set_input_as_handled()
 
 
 ## Whether a click or button press would be acted on right now.
@@ -124,6 +152,7 @@ func _act(action: Action) -> void:
 	var side := state.active_side
 	var battle := _battle
 	state = out.state
+	_history.append(action)
 	action_applied.emit(side, action)
 	await player.play(out.events)
 	if battle != _battle:

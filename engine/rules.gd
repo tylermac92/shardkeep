@@ -11,14 +11,15 @@ class Outcome:
 	var events: Array[Dictionary] = []
 
 
-## A new battle with its board drawn from the setup stream. class_ids, if given, equip
-## side 0 and side 1 from classes.json; otherwise the sides start empty for the caller to fill.
-static func new_battle(battle_seed: int, content: ContentLoader, class_ids: Array = []) -> BattleState:
+## A new battle with its board drawn from the setup stream. loadouts, if given, equip side 0
+## and side 1: each is a classes.json id or a class entry of its own (hp, mana_cap, spells,
+## weapon). Without them the sides start empty for the caller to fill.
+static func new_battle(battle_seed: int, content: ContentLoader, loadouts: Array = []) -> BattleState:
 	var s := BattleState.new()
 	s.content = content
 	s.streams = Streams.new(battle_seed)
-	for i in class_ids.size():
-		var def: Dictionary = content.classes[class_ids[i]]
+	for i in loadouts.size():
+		var def: Dictionary = loadouts[i] if loadouts[i] is Dictionary else content.classes[loadouts[i]]
 		var side := s.sides[i]
 		side.hp = int(def.hp)
 		side.hp_max = side.hp
