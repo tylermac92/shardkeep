@@ -3,12 +3,14 @@
     {
       "id": "loadout_a", "name": "Loadout A", "hp": 50,
       "mana_cap": { "red": 20, "blue": 20, "green": 20, "yellow": 20 },
-      "spells": ["firebolt", "tidal_shift"], "weapon": "sword"
+      "spells": ["firebolt", "tidal_shift"], "weapon": "sword",
+      "ai": { "weights": { "damage": 1.2 } }
     },
     {
       "id": "loadout_b", "name": "Loadout B", "hp": 50,
       "mana_cap": { "red": 20, "blue": 20, "green": 20, "yellow": 20 },
-      "spells": ["stone_barrier", "concussion"], "weapon": "mace"
+      "spells": ["stone_barrier", "concussion"], "weapon": "mace",
+      "ai": { "weights": { "mana": 0.6, "status": 1.2 } }
     }
   ]
 }

@@ -23,7 +23,20 @@
             }
           },
           "spells": { "type": "array", "maxItems": 6, "uniqueItems": true, "items": { "type": "string" } },
-          "weapon": { "type": "string" }
+          "weapon": { "type": "string" },
+          "ai": {
+            "description": "How the AI plays this side. Weights left out use AI.DEFAULT_WEIGHTS",
+            "type": "object", "additionalProperties": false,
+            "properties": {
+              "weights": {
+                "type": "object", "additionalProperties": false,
+                "properties": {
+                  "damage": { "type": "number" }, "hurt": { "type": "number" }, "mana": { "type": "number" },
+                  "ap": { "type": "number" }, "extra_turn": { "type": "number" }, "status": { "type": "number" }
+                }
+              }
+            }
+          }
         }
       }
     }

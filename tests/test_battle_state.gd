@@ -1,5 +1,7 @@
 extends GutTest
 
+const Fixtures := preload("res://tests/fixtures.gd")
+
 
 func test_gem_enum_matches_content_order() -> void:
 	for i in ContentLoader.GEM_IDS.size():
@@ -53,3 +55,23 @@ func test_clone_is_independent() -> void:
 	assert_eq(s.streams.draws[Streams.SETUP], 0)
 	assert_eq(s.active_side, 0)
 	assert_eq(c.board.gems[1], Board.Gem.BLUE, "clone copies the rest of the board")
+
+
+func test_state_hash_is_canonical() -> void:
+	var s := Rules.new_battle(3, Fixtures.test_content, ["loadout_a", "loadout_b"])
+	var h := s.state_hash()
+	assert_eq(h.size(), 32)
+	assert_eq(s.clone().state_hash(), h)
+	assert_eq(Rules.new_battle(3, Fixtures.test_content, ["loadout_a", "loadout_b"]).state_hash(), h)
+	var changes: Array[Callable] = [
+		func(c: BattleState) -> void: c.board.special[5] = Board.Special.BURST,
+		func(c: BattleState) -> void: c.streams.draws[Streams.AI_1] += 1,
+		func(c: BattleState) -> void: c.sim_draw_budget = PackedInt32Array([1]),
+		func(c: BattleState) -> void: c.sides[1].mana[2] += 1,
+		func(c: BattleState) -> void: c.sides[0].statuses.append({id = "burn", turns = 1, stacks = 1}),
+		func(c: BattleState) -> void: c.sides[0].stunned_last_turn = true,
+	]
+	for change in changes:
+		var c := s.clone()
+		change.call(c)
+		assert_ne(c.state_hash(), h)

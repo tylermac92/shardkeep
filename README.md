@@ -26,4 +26,5 @@ godot --headless --script res://tools/content_lint.gd  # content reference check
 tools/validate_content.sh                              # JSON Schema (pipx install check-jsonschema)
 tools/lint_engine.sh                                   # engine purity lint
 tools/test_lints.sh                                    # proves the two lints above catch bad input
+godot --headless --script res://tools/benchmark.gd -- --positions 200  # AI decision time per level
 ```

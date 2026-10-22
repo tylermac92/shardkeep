@@ -32,3 +32,21 @@ func clone() -> SideState:
 	c.statuses = statuses.duplicate(true)
 	c.stunned_last_turn = stunned_last_turn
 	return c
+
+
+## Writes every field in a fixed order, for BattleState.state_hash().
+func serialize(buf: StreamPeerBuffer) -> void:
+	for v in [hp, hp_max, action_points, gold_gained, int(stunned_last_turn)]:
+		buf.put_64(v)
+	for ints: PackedInt32Array in [mana, mana_cap, cooldowns]:
+		buf.put_32(ints.size())
+		buf.put_data(ints.to_byte_array())
+	buf.put_32(spells.size())
+	for id in spells:
+		buf.put_utf8_string(id)
+	buf.put_utf8_string(weapon)
+	buf.put_32(statuses.size())
+	for st in statuses:
+		buf.put_utf8_string(str(st.id))
+		buf.put_64(st.turns)
+		buf.put_64(st.stacks)
