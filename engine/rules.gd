@@ -114,6 +114,15 @@ static func apply(state: BattleState, action: Action) -> Outcome:
 	return out
 
 
+## The next gem each column will drop: the ghost row both sides see above the board.
+static func ghost_row(state: BattleState) -> PackedByteArray:
+	var peek := state.streams.clone()
+	var out := PackedByteArray()
+	for x in Board.SIZE:
+		out.append(peek.next_weighted(Streams.COL_0 + x, state.content.gem_weights))
+	return out
+
+
 ## Deals damage to a side. Barrier soaks it up first; a knockout ends the battle, and if both
 ## sides are down the acting side loses.
 static func damage(s: BattleState, target: int, amount: int, events: Array[Dictionary]) -> void:

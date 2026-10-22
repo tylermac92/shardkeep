@@ -15,6 +15,12 @@ A match-3 RPG in Godot 4.7. Design docs live in [`docs/`](docs/).
 | `tests/` | GUT tests (`test_*.gd`) |
 | `addons/gut/` | Vendored [GUT](https://github.com/bitwes/Gut) 9.7.1 |
 
+## Play
+
+`godot` from the project folder opens the battle screen (M0: placeholder art). Pick Easy or
+Normal, then swap gems by clicking two neighbors or dragging one onto the other. The seed is
+shown at the top; 1x, 2x and Instant set the animation speed.
+
 ## Checks
 
 Run what CI runs:

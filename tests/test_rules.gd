@@ -206,3 +206,15 @@ func test_search_budget_spawns_unknown_past_the_ghost_row() -> void:
 		assert_true(s.board.gems[y * Board.SIZE + 4] <= Board.Gem.GOLD)
 	assert_eq(s.sim_draw_budget[2], 0)
 	assert_eq(s.streams.draws[Streams.COL_2], 1, "fogged draws don't use the stream")
+
+
+func test_ghost_row_is_what_falls_next() -> void:
+	var s := state_of(CASCADE_BOARD, 7)
+	var draws := s.streams.draws.duplicate()
+	var ghost := Rules.ghost_row(s)
+	assert_eq(s.streams.draws, draws, "peeking doesn't use the streams")
+	for x in Board.SIZE:
+		s.board.gems[7 * Board.SIZE + x] = Board.Gem.EMPTY
+	var ignored: Array[Dictionary] = []
+	Rules.fall_and_refill(s, ignored)
+	assert_eq(s.board.gems.slice(0, Board.SIZE), ghost)
