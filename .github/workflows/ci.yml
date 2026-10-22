@@ -5,6 +5,7 @@ on: push
 jobs:
   lint:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - run: pipx install check-jsonschema==0.38.2
@@ -18,6 +19,8 @@ jobs:
   godot:
     runs-on: ubuntu-24.04
     container: barichello/godot-ci:4.7.2
+    # A GDScript parse error makes headless Godot wait for debugger input instead of exiting.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - name: Import project
