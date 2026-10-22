@@ -1,5 +1,7 @@
 extends GutTest
 
+const Fixtures := preload("res://tests/fixtures.gd")
+
 ## Swapping (2,6) with (2,7) starts a 3-step cascade: red on row 7, then the skulls in
 ## row 5 drop next to (3,6), then three greens from different heights meet on row 5.
 const CASCADE_BOARD := """
@@ -27,15 +29,7 @@ const CASCADE_AFTER := """
 
 
 func state_of(text: String, battle_seed := 0) -> BattleState:
-	var s := BattleState.new()
-	s.content = ContentDB.content
-	s.board = Board.from_text(text)
-	s.streams = Streams.new(battle_seed)
-	for side in s.sides:
-		side.hp = 50
-		side.hp_max = 50
-		side.mana_cap = PackedInt32Array([20, 20, 20, 20])
-	return s
+	return Fixtures.state_of(text, battle_seed)
 
 
 ## Events with the long "fell" move lists reduced to their type; the final board covers them.

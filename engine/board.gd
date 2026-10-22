@@ -11,6 +11,8 @@ const SIZE := 8
 const CELLS := SIZE * SIZE
 ## Golden board text symbol per Gem, in enum order.
 const SYMBOLS := "RBGYSA$W?."
+## Golden board suffix per Special, in enum order: "R+" is a red BURST, "S*" a SKULL_BOMB.
+const SPECIAL_SUFFIXES := ["", "+", "*"]
 
 var gems := PackedByteArray()
 var special := PackedByteArray()
@@ -33,7 +35,8 @@ func clone() -> Board:
 	return c
 
 
-## Parses the golden board format: 8 lines of 8 space-separated symbols from SYMBOLS.
+## Parses the golden board format: 8 lines of 8 space-separated symbols from SYMBOLS,
+## each optionally followed by a suffix from SPECIAL_SUFFIXES.
 ## Blank lines and surrounding whitespace are ignored. Returns null on bad input.
 static func from_text(text: String) -> Board:
 	var rows := PackedStringArray()
@@ -50,11 +53,14 @@ static func from_text(text: String) -> Board:
 			push_error("golden board row %d: expected %d symbols, got %d" % [y, SIZE, symbols.size()])
 			return null
 		for x in SIZE:
-			var gem := SYMBOLS.find(symbols[x])
-			if symbols[x].length() != 1 or gem < 0:
-				push_error("golden board row %d: unknown symbol \"%s\"" % [y, symbols[x]])
+			var token := symbols[x]
+			var gem := SYMBOLS.find(token.left(1))
+			var sp := SPECIAL_SUFFIXES.find(token.substr(1))
+			if gem < 0 or sp < 0 or token.length() > 2:
+				push_error("golden board row %d: unknown symbol \"%s\"" % [y, token])
 				return null
 			b.gems[y * SIZE + x] = gem
+			b.special[y * SIZE + x] = sp
 	return b
 
 
@@ -63,6 +69,6 @@ func to_text() -> String:
 	for y in SIZE:
 		var row := PackedStringArray()
 		for x in SIZE:
-			row.append(SYMBOLS[gems[y * SIZE + x]])
+			row.append(SYMBOLS[gems[y * SIZE + x]] + SPECIAL_SUFFIXES[special[y * SIZE + x]])
 		rows.append(" ".join(row))
 	return "\n".join(rows)
