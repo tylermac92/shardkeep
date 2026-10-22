@@ -10,6 +10,11 @@
       "type": "integer",
       "minimum": 0
     },
+    "second_mover_mana": {
+      "description": "Mana of each color the side that moves second starts with (up to its caps), to offset the first mover's edge.",
+      "type": "integer",
+      "minimum": 0
+    },
     "gems": {
       "description": "One entry per spawnable gem type; content_lint checks ids are unique, so 7 entries means every type exactly once.",
       "type": "array",

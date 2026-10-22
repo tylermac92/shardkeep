@@ -279,3 +279,30 @@ func test_f9_exports_a_replay_of_the_battle_so_far() -> void:
 	var r := Replay.play(JSON.parse_string(FileAccess.get_file_as_string(path)), ContentDB.content)
 	assert_eq(r.error, "")
 	assert_eq(r.state.state_hash(), b.state.state_hash())
+
+
+func test_loadout_pick_and_fun_check_notes() -> void:
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(BattleController.NOTES_PATH))
+	var b := await _screen()
+	b.min_think_msec = 0
+	b.player.speed = EventPlayer.Speed.INSTANT
+	b._loadout_pick.select(1)
+	_click_button(_button(b, "Easy"))
+	assert_eq(b.loadouts, ["loadout_b", "loadout_a"])
+	assert_eq(b.state.sides[0].weapon, &"mace")
+	assert_false(b._notes.visible, "notes only after a battle")
+	while b.state.result == BattleState.Result.ONGOING:
+		await _settled(b)
+		if b.accepting_input():
+			b._player_act(AI.choose(b.state, AI.Level.EASY))
+	assert_true(b._notes.visible)
+	b._good.text = "Big cascade, \"wow\""
+	b._bad.text = "Too long, slow"
+	_click_button(_button(b, "Save notes"))
+	_click_button(_button(b, "Save notes"))
+	var lines := FileAccess.get_file_as_string(BattleController.NOTES_PATH).strip_edges().split("\n")
+	assert_eq(lines.size(), 2, "a header and one row, saved once")
+	assert_eq(lines[0], ",".join(BattleController.NOTES_COLUMNS))
+	assert_string_contains(lines[1], "\"loadout_b\",\"loadout_a\",\"easy\"")
+	assert_string_contains(lines[1], "\"Big cascade, \"\"wow\"\"\",\"Too long, slow\"")
+	assert_string_contains(b._notes_status.text, "battle 1 of 30")

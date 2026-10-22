@@ -18,6 +18,15 @@ func _initialize() -> void:
 	var states := positions(content, count)
 	var weights := [AI.weights_for(content.classes[LOADOUTS[0]]), AI.weights_for(content.classes[LOADOUTS[1]])]
 	print("benchmark: %d positions" % states.size())
+	var applies := 0
+	var apply_usec := 0
+	for s in states:
+		for a in Rules.legal_actions(s):
+			var t := Time.get_ticks_usec()
+			Rules.apply(s, a)
+			apply_usec += Time.get_ticks_usec() - t
+			applies += 1
+	print("apply() average %.2f ms over %d actions" % [apply_usec / 1000.0 / applies, applies])
 	for level in AI.Level.size():
 		var total := 0
 		var worst := 0
