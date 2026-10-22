@@ -184,3 +184,25 @@ func test_clearing_column_2_never_changes_what_falls_in_column_5() -> void:
 	assert_eq(few.streams.draws[Streams.COL_5], 6)
 	assert_eq(few.streams.draws[Streams.COL_2], 3)
 	assert_eq(many.streams.draws[Streams.COL_2], 7)
+
+
+func test_search_budget_spawns_unknown_past_the_ghost_row() -> void:
+	var s := state_of(CASCADE_BOARD, 7)
+	var ghost := s.clone()
+	var ignored: Array[Dictionary] = []
+	ghost.board.gems[7 * Board.SIZE + 2] = Board.Gem.EMPTY
+	Rules.fall_and_refill(ghost, ignored)  # real play: one gem from column 2's stream
+	s.sim_draw_budget.resize(Board.SIZE)
+	s.sim_draw_budget.fill(1)
+	s.sim_draw_budget[4] = -1  # -1 = unlimited for that column
+	for y in 3:
+		s.board.gems[(5 + y) * Board.SIZE + 2] = Board.Gem.EMPTY
+		s.board.gems[(5 + y) * Board.SIZE + 4] = Board.Gem.EMPTY
+	Rules.fall_and_refill(s, ignored)
+	assert_eq(s.board.gems[2 * Board.SIZE + 2], ghost.board.gems[2], "the lowest new gem is the ghost gem")
+	for y in 2:
+		assert_eq(s.board.gems[y * Board.SIZE + 2], Board.Gem.UNKNOWN)
+	for y in 3:
+		assert_true(s.board.gems[y * Board.SIZE + 4] <= Board.Gem.GOLD)
+	assert_eq(s.sim_draw_budget[2], 0)
+	assert_eq(s.streams.draws[Streams.COL_2], 1, "fogged draws don't use the stream")

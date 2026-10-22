@@ -108,7 +108,8 @@ static func apply(state: BattleState, action: Action) -> Outcome:
 		_end_turn(s, out.events)
 		if s.result != BattleState.Result.ONGOING:
 			return out
-	if _swaps(s.board, true).is_empty():
+	# No reshuffle in AI search: it would draw from hidden streams, and a fogged board can't settle.
+	if _swaps(s.board, true).is_empty() and s.sim_draw_budget.is_empty():
 		reshuffle(s, out.events)
 	return out
 
@@ -233,7 +234,13 @@ static func fall_and_refill(s: BattleState, events: Array[Dictionary]) -> void:
 			write -= 1
 		for y in range(write, -1, -1):
 			var c := y * Board.SIZE + x
-			b.gems[c] = s.streams.next_weighted(Streams.COL_0 + x, s.content.gem_weights)
+			var fogged := not s.sim_draw_budget.is_empty() and s.sim_draw_budget[x] >= 0
+			if fogged and s.sim_draw_budget[x] == 0:
+				b.gems[c] = Board.Gem.UNKNOWN  # AI search: past what the player can see
+			else:
+				if fogged:
+					s.sim_draw_budget[x] -= 1
+				b.gems[c] = s.streams.next_weighted(Streams.COL_0 + x, s.content.gem_weights)
 			spawned_cells.append(c)
 			spawned_gems.append(b.gems[c])
 	if not moves.is_empty():

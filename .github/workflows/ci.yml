@@ -29,3 +29,5 @@ jobs:
         run: godot --headless --script res://tools/content_lint.gd
       - name: GUT
         run: tools/run_tests.sh
+      - name: AI benchmark (smoke run; the full run is 200 positions)
+        run: godot --headless --script res://tools/benchmark.gd -- --positions 5
