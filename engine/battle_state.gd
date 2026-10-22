@@ -14,6 +14,8 @@ var extra_turn_chain := 0
 ## Battle seed plus values used per stream.
 var streams := Streams.new()
 var result := Result.ONGOING
+## Content definitions, shared by reference with every clone and never mutated.
+var content: ContentLoader
 
 
 func clone() -> BattleState:
@@ -25,4 +27,5 @@ func clone() -> BattleState:
 	c.extra_turn_chain = extra_turn_chain
 	c.streams = streams.clone()
 	c.result = result
+	c.content = content
 	return c

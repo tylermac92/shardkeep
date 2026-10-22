@@ -30,6 +30,19 @@ static func find_groups(board: Board) -> Array[Group]:
 	return groups
 
 
+## True if the row or column through cell holds a run of 3+. On a board that had no
+## matches before a swap, that is exactly "the swap creates a match".
+static func has_match_through(board: Board, cell: int) -> bool:
+	var x := cell % Board.SIZE
+	var row := cell - x
+	var none_i := PackedInt32Array()
+	var none_b := PackedByteArray()
+	for gem in range(Board.Gem.RED, Board.Gem.GOLD + 1):
+		if _scan(board, gem, row, 1, 0, none_i, none_b) or _scan(board, gem, x, Board.SIZE, 0, none_i, none_b):
+			return true
+	return false
+
+
 ## One pass per gem type, so a WILD shared by a red and a blue run doesn't merge the two.
 static func _groups_for(board: Board, gem: int) -> Array[Group]:
 	var parent := PackedInt32Array()
@@ -61,9 +74,10 @@ static func _groups_for(board: Board, gem: int) -> Array[Group]:
 	return groups
 
 
-## Finds runs of 3+ along one row or column and unions their cells.
+## Finds runs of 3+ along one row or column and unions their cells (dir 0 only reports).
 ## A run needs one real gem of the type; WILD stands in for mana colors only.
-static func _scan(board: Board, gem: int, start: int, step: int, dir: int, parent: PackedInt32Array, dirs: PackedByteArray) -> void:
+static func _scan(board: Board, gem: int, start: int, step: int, dir: int, parent: PackedInt32Array, dirs: PackedByteArray) -> bool:
+	var found := false
 	var use_wild := gem <= Board.Gem.YELLOW
 	var run_start := 0
 	var length := 0
@@ -80,11 +94,15 @@ static func _scan(board: Board, gem: int, start: int, step: int, dir: int, paren
 				has_real = has_real or g == gem
 				continue
 		if length >= 3 and has_real:
+			found = true
+			if dir == 0:
+				return true
 			for k in length:
 				var cell := run_start + k * step
 				dirs[cell] |= dir
 				parent[_find(parent, cell)] = _find(parent, run_start)
 		length = 0
+	return found
 
 
 static func _find(parent: PackedInt32Array, c: int) -> int:
