@@ -31,6 +31,16 @@ jobs:
         run: tools/run_tests.sh
       - name: AI benchmark (smoke run; the full run is 200 positions)
         run: godot --headless --script res://tools/benchmark.gd -- --positions 5
+      - name: Balance smoke run (3 matchups x 67 = 201 Easy-vs-Easy games)
+        timeout-minutes: 5
+        run: godot --headless --script res://tools/balance_runner.gd -- --games 67 --out "$GITHUB_WORKSPACE/balance"
+      - name: Upload balance CSVs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: balance
+          path: balance/
+          if-no-files-found: ignore
 
   fuzz:
     runs-on: ubuntu-24.04

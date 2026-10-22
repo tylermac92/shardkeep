@@ -34,7 +34,12 @@ tools/lint_engine.sh                                   # engine purity lint
 tools/test_lints.sh                                    # proves the two lints above catch bad input
 godot --headless --script res://tools/benchmark.gd -- --positions 200  # AI decision time per level
 godot --headless --script res://tools/fuzz.gd -- --actions 10000       # AI-vs-AI invariant checks (own CI job)
+godot --headless --script res://tools/balance_runner.gd -- --games 1000  # balance CSVs and flags (CI: 67 games)
 ```
+
+The balance runner plays A vs B, A vs A and B vs B unless given `--matchups file.json` (format in
+the script's header), splits games across one worker process per core, and writes
+`summary.csv`, a per-battle CSV and the most extreme battle as a replay for each matchup.
 
 ## Replays
 
