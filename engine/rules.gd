@@ -16,18 +16,7 @@ static func new_battle(battle_seed: int, content: ContentLoader) -> BattleState:
 	var s := BattleState.new()
 	s.content = content
 	s.streams = Streams.new(battle_seed)
-	var b := s.board
-	var weights := content.gem_weights
-	while true:
-		for c in Board.CELLS:
-			var g := s.streams.next_weighted(Streams.SETUP, weights)
-			# Redraw any gem that would complete a run with the two to its left or above.
-			while (c % Board.SIZE >= 2 and b.gems[c - 1] == g and b.gems[c - 2] == g) \
-					or (c >= 2 * Board.SIZE and b.gems[c - Board.SIZE] == g and b.gems[c - 2 * Board.SIZE] == g):
-				g = s.streams.next_weighted(Streams.SETUP, weights)
-			b.gems[c] = g
-		if not _swaps(b, true).is_empty():
-			break
+	_fill_board(s, false)
 	return s
 
 
@@ -49,33 +38,80 @@ static func apply(state: BattleState, action: Action) -> Outcome:
 	out.state = s
 	_swap_cells(s.board, action.a, action.b)
 	out.events.append({type = "swapped", a = action.a, b = action.b})
-	cascade(s, out.events)
-	s.active_side = 1 - s.active_side
-	s.turn += 1
-	out.events.append({type = "turn_passed", to_side = s.active_side})
+	var extra_turn := cascade(s, out.events, PackedInt32Array([action.a, action.b]))
+	if s.result != BattleState.Result.ONGOING:
+		return out
+	if extra_turn:
+		out.events.append({type = "extra_turn", side = s.active_side, reason = "match"})
+	else:
+		s.active_side = 1 - s.active_side
+		s.turn += 1
+		out.events.append({type = "turn_passed", to_side = s.active_side})
+	if _swaps(s.board, true).is_empty():
+		reshuffle(s, out.events)
 	return out
 
 
-## Match, pay the active side, clear, fall and refill, until the board settles.
-static func cascade(s: BattleState, events: Array[Dictionary]) -> void:
+## Match, pay the active side, clear (with blasts), place new specials, fall and refill,
+## until the board settles or a side is knocked out. Returns whether any group earned an
+## extra turn. swapped holds the cells of the swap that started it, if any.
+static func cascade(s: BattleState, events: Array[Dictionary], swapped := PackedInt32Array()) -> bool:
+	var extra_turn := false
 	var depth := 0
 	while true:
 		var groups := Matcher.find_groups(s.board)
 		if groups.is_empty():
-			return
+			return extra_turn
 		depth += 1
+		var b := s.board
 		var hit := {}
 		for g in groups:
 			events.append({type = "matched", cells = g.cells, gem = g.gem, group_size = g.cells.size(), cascade_depth = depth})
-			_pay(s, g, events)
+			var wild := 1
 			for c in g.cells:
 				hit[c] = true
-		var cells := PackedInt32Array(hit.keys())
-		cells.sort()
-		for c in cells:
-			_clear_cell(s.board, c)
-		events.append({type = "cleared", cells = cells, cause = "match"})
+				if b.gems[c] == Board.Gem.WILD:
+					wild = 2
+			_pay(s, g.gem, g.cells.size() * wild, events)
+			if s.result != BattleState.Result.ONGOING:
+				return extra_turn
+			extra_turn = extra_turn or g.extra_turn
+		var matched := PackedInt32Array(hit.keys())
+		matched.sort()
+		events.append({type = "cleared", cells = matched, cause = "match"})
+		if not _blast(s, matched, hit, events):
+			return extra_turn
+		for c in hit:
+			_clear_cell(b, c)
+		for g in groups:
+			if g.creates != Matcher.Creates.NOTHING:
+				_place_special(s, g, swapped if depth == 1 else PackedInt32Array(), events)
 		fall_and_refill(s, events)
+	return extra_turn
+
+
+## Permutes the gems with the shuffle stream until the board has no matches and a legal swap
+## (after 100 tries, draws a fresh board from the skyfall streams). Both sides then lose a
+## quarter of each mana pool, rounded down. The acting side keeps its turn.
+static func reshuffle(s: BattleState, events: Array[Dictionary]) -> void:
+	var b := s.board
+	var settled := false
+	for attempt in 100:
+		for i in range(Board.CELLS - 1, 0, -1):
+			_swap_cells(b, i, s.streams.next_int(Streams.SHUFFLE) % (i + 1))
+		if Matcher.find_groups(b).is_empty() and not _swaps(b, true).is_empty():
+			settled = true
+			break
+	if not settled:
+		_fill_board(s, true)
+	var lost := []
+	for side in s.sides:
+		var loss := PackedInt32Array()
+		for color in 4:
+			loss.append(side.mana[color] / 4)
+			side.mana[color] -= loss[color]
+		lost.append(loss)
+	events.append({type = "reshuffled", gems = b.gems.duplicate(), special = b.special.duplicate(), mana_lost = lost})
 
 
 ## Drops gems into empty cells, then fills each column from its own skyfall stream.
@@ -110,22 +146,19 @@ static func fall_and_refill(s: BattleState, events: Array[Dictionary]) -> void:
 		events.append({type = "spawned", cells = spawned_cells, gems = spawned_gems})
 
 
-## Base reward for a matched group, paid to the active side (skull damage hits the other side).
-static func _pay(s: BattleState, g: Matcher.Group, events: Array[Dictionary]) -> void:
-	var def: Dictionary = s.content.gem_defs[g.gem]
-	var amount: int = int(def.amount) * g.cells.size()
+## Pays count gems of one type to the active side (skull damage hits the other side).
+static func _pay(s: BattleState, gem: int, count: int, events: Array[Dictionary]) -> void:
+	var def: Dictionary = s.content.gem_defs[gem]
+	var amount: int = int(def.amount) * count
 	var side := s.active_side
 	var me := s.sides[side]
 	match def.reward:
 		"mana":
-			var gain := clampi(me.mana_cap[g.gem] - me.mana[g.gem], 0, amount)
-			me.mana[g.gem] += gain
-			_changed(events, side, MANA_KINDS[g.gem], gain)
+			var gain := clampi(me.mana_cap[gem] - me.mana[gem], 0, amount)
+			me.mana[gem] += gain
+			_changed(events, side, MANA_KINDS[gem], gain)
 		"damage":
-			var foe := s.sides[1 - side]
-			var dmg := mini(amount, foe.hp)
-			foe.hp -= dmg
-			_changed(events, 1 - side, "hp", -dmg)
+			_damage(s, 1 - side, amount, events)
 		"ap":
 			me.action_points += amount
 			_changed(events, side, "ap", amount)
@@ -134,9 +167,110 @@ static func _pay(s: BattleState, g: Matcher.Group, events: Array[Dictionary]) ->
 			_changed(events, side, "gold", amount)
 
 
+## Deals damage and ends the battle on a knockout. If both sides are down, the acting side loses.
+static func _damage(s: BattleState, target: int, amount: int, events: Array[Dictionary]) -> void:
+	var side := s.sides[target]
+	var dmg := mini(amount, side.hp)
+	side.hp -= dmg
+	_changed(events, target, "hp", -dmg)
+	var me := s.active_side
+	var winner := -1
+	if s.sides[me].hp <= 0:
+		winner = 1 - me
+	elif s.sides[1 - me].hp <= 0:
+		winner = me
+	if winner >= 0:
+		s.result = BattleState.Result.SIDE0_WON if winner == 0 else BattleState.Result.SIDE1_WON
+		events.append({type = "battle_ended", winner = winner})
+
+
+## Sets off every BURST and SKULL_BOMB among the cleared cells, chaining into specials they hit.
+## Blasted gems pay out. Adds blasted cells to hit. Returns false if the battle ended.
+static func _blast(s: BattleState, cleared: PackedInt32Array, hit: Dictionary, events: Array[Dictionary]) -> bool:
+	var b := s.board
+	var queue: Array[int] = []
+	for c in cleared:
+		if b.special[c] != Board.Special.NONE:
+			queue.append(c)
+	while not queue.is_empty():
+		var center: int = queue.pop_front()
+		var bomb := b.special[center] == Board.Special.SKULL_BOMB
+		var cells := PackedInt32Array()
+		var counts := PackedInt32Array([0, 0, 0, 0, 0, 0, 0])
+		var cx := center % Board.SIZE
+		var cy := center / Board.SIZE
+		for y in range(maxi(cy - 1, 0), mini(cy + 2, Board.SIZE)):
+			for x in range(maxi(cx - 1, 0), mini(cx + 2, Board.SIZE)):
+				var c := y * Board.SIZE + x
+				if hit.has(c) or b.gems[c] == Board.Gem.EMPTY:
+					continue
+				hit[c] = true
+				cells.append(c)
+				if b.gems[c] <= Board.Gem.GOLD:
+					counts[b.gems[c]] += 1
+				if b.special[c] != Board.Special.NONE:
+					queue.append(c)
+		events.append({type = "cleared", cells = cells, cause = "bomb" if bomb else "burst"})
+		for gem in counts.size():
+			if counts[gem] > 0:
+				_pay(s, gem, counts[gem], events)
+				if s.result != BattleState.Result.ONGOING:
+					return false
+		if bomb:
+			_damage(s, 1 - s.active_side, s.content.skull_bomb_damage, events)
+			if s.result != BattleState.Result.ONGOING:
+				return false
+	return true
+
+
+## Puts a group's new special on its swapped cell if it has one, else its lowest, then leftmost cell.
+static func _place_special(s: BattleState, g: Matcher.Group, swapped: PackedInt32Array, events: Array[Dictionary]) -> void:
+	var cell := -1
+	for c in swapped:
+		if g.cells.has(c):
+			cell = c
+			break
+	if cell < 0:
+		cell = g.cells[0]
+		for c in g.cells:
+			if c / Board.SIZE > cell / Board.SIZE or (c / Board.SIZE == cell / Board.SIZE and c < cell):
+				cell = c
+	var b := s.board
+	match g.creates:
+		Matcher.Creates.WILD:
+			b.gems[cell] = Board.Gem.WILD
+		Matcher.Creates.BURST:
+			b.gems[cell] = g.gem
+			b.special[cell] = Board.Special.BURST
+		Matcher.Creates.SKULL_BOMB:
+			b.gems[cell] = Board.Gem.SKULL
+			b.special[cell] = Board.Special.SKULL_BOMB
+	events.append({type = "special_created", cell = cell, kind = g.creates, gem = b.gems[cell]})
+
+
 static func _changed(events: Array[Dictionary], side: int, kind: String, delta: int) -> void:
 	if delta != 0:
 		events.append({type = "resource_changed", side = side, kind = kind, delta = delta})
+
+
+## Draws a full board with no matches and at least one legal swap, from the setup stream or,
+## for a reshuffle that gave up, from each column's skyfall stream.
+static func _fill_board(s: BattleState, from_columns: bool) -> void:
+	var b := s.board
+	var weights := s.content.gem_weights
+	while true:
+		for c in Board.CELLS:
+			var stream := Streams.COL_0 + c % Board.SIZE if from_columns else Streams.SETUP
+			var g := s.streams.next_weighted(stream, weights)
+			# Redraw any gem that would complete a run with the two to its left or above.
+			while (c % Board.SIZE >= 2 and b.gems[c - 1] == g and b.gems[c - 2] == g) \
+					or (c >= 2 * Board.SIZE and b.gems[c - Board.SIZE] == g and b.gems[c - 2 * Board.SIZE] == g):
+				g = s.streams.next_weighted(stream, weights)
+			b.gems[c] = g
+			b.special[c] = Board.Special.NONE
+			b.locked[c] = 0
+		if not _swaps(b, true).is_empty():
+			return
 
 
 ## All matching swaps on the board, or just the first one when first_only is set.

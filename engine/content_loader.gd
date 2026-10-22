@@ -13,6 +13,8 @@ var gems: Array = []
 var gem_weights := PackedInt32Array()
 ## gems.json entries by gem type; null where a type is missing.
 var gem_defs: Array = []
+## Bonus damage when a SKULL_BOMB goes off.
+var skull_bomb_damage := 0
 
 
 ## Loads every content file. Returns an empty list on success, else one line per problem.
@@ -22,6 +24,7 @@ func load_all(dir: String = CONTENT_DIR) -> PackedStringArray:
 	var data: Variant = _read_json(dir.path_join("gems.json"), errors)
 	if data is Dictionary and data.get("gems") is Array:
 		gems = data["gems"]
+		skull_bomb_damage = int(data.get("skull_bomb_damage", 0))
 		gem_weights.resize(GEM_IDS.size())
 		gem_weights.fill(0)
 		gem_defs.resize(GEM_IDS.size())
