@@ -30,14 +30,18 @@ static func find_groups(board: Board) -> Array[Group]:
 	return groups
 
 
-## True if the row or column through cell holds a run of 3+. On a board that had no
-## matches before a swap, that is exactly "the swap creates a match".
+## True if the row or column through cell holds a run of 3+ of a type the cell's gem can be
+## part of (its own type, or any mana color for a WILD). On a board that had no matches before
+## a swap, checking both swapped cells is exactly "the swap creates a match".
 static func has_match_through(board: Board, cell: int) -> bool:
+	var g := board.gems[cell]
+	if g > Board.Gem.WILD:
+		return false
 	var x := cell % Board.SIZE
 	var row := cell - x
 	var none_i := PackedInt32Array()
 	var none_b := PackedByteArray()
-	for gem in range(Board.Gem.RED, Board.Gem.GOLD + 1):
+	for gem in range(Board.Gem.RED, Board.Gem.YELLOW + 1) if g == Board.Gem.WILD else [g]:
 		if _scan(board, gem, row, 1, 0, none_i, none_b) or _scan(board, gem, x, Board.SIZE, 0, none_i, none_b):
 			return true
 	return false
