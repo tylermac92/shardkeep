@@ -13,5 +13,6 @@ func _initialize() -> void:
 	for e in errors:
 		printerr("content_lint: " + e)
 	if errors.is_empty():
-		print("content_lint: ok (%d gems)" % loader.gems.size())
+		print("content_lint: ok (%d gems, %d spells, %d weapons, %d statuses, %d classes)" % [
+			loader.gems.size(), loader.spells.size(), loader.weapons.size(), loader.statuses.size(), loader.classes.size()])
 	quit(1 if errors else 0)

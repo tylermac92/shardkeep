@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Statuses: what each does at the engine's fixed hook points",
+  "description": "Every status ticks down at the end of its owner's turn, including a turn skipped by stun.",
+  "type": "object",
+  "required": ["statuses"],
+  "additionalProperties": false,
+  "properties": {
+    "statuses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "name": { "type": "string" },
+          "on_turn_start": { "description": "Effects run for the owner (\"self\") as its turn starts", "type": "array", "items": { "$ref": "effect.schema.json" } },
+          "skips_turn": { "description": "on_turn_start: the owner can only pass. Can't be applied to a side that was stunned on its previous turn", "type": "boolean" },
+          "absorbs_damage": { "description": "on_damage_taken: stacks soak up damage before HP; the status ends when they run out", "type": "boolean" }
+        }
+      }
+    }
+  }
+}

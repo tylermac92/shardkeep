@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "One effect op, as used by spells, weapons and statuses",
+  "description": "\"self\" is the caster (or a status's owner), \"enemy\" the other side.",
+  "type": "object",
+  "required": ["op"],
+  "properties": {
+    "op": { "enum": ["damage", "damage_per_gem", "gain_mana", "convert_gems", "apply_status", "extra_turn"] }
+  },
+  "oneOf": [
+    {
+      "properties": { "op": { "const": "damage" }, "target": { "$ref": "#/$defs/target" }, "amount": { "$ref": "#/$defs/count" } },
+      "required": ["target", "amount"], "additionalProperties": false
+    },
+    {
+      "description": "amount = per x gems of that type on the board at cast time",
+      "properties": { "op": { "const": "damage_per_gem" }, "target": { "$ref": "#/$defs/target" }, "gem": { "$ref": "#/$defs/gem" }, "per": { "$ref": "#/$defs/count" } },
+      "required": ["target", "gem", "per"], "additionalProperties": false
+    },
+    {
+      "properties": { "op": { "const": "gain_mana" }, "target": { "$ref": "#/$defs/target" }, "color": { "$ref": "#/$defs/color" }, "amount": { "$ref": "#/$defs/count" } },
+      "required": ["target", "color", "amount"], "additionalProperties": false
+    },
+    {
+      "description": "count gems picked with the effects stream, or \"all\"",
+      "properties": {
+        "op": { "const": "convert_gems" }, "from": { "$ref": "#/$defs/gem" }, "to": { "$ref": "#/$defs/gem" },
+        "count": { "oneOf": [{ "type": "integer", "minimum": 1 }, { "const": "all" }] }
+      },
+      "required": ["from", "to", "count"], "additionalProperties": false
+    },
+    {
+      "description": "stacks defaults to 1; for barrier it is the damage absorbed",
+      "properties": {
+        "op": { "const": "apply_status" }, "target": { "$ref": "#/$defs/target" }, "status": { "type": "string" },
+        "turns": { "type": "integer", "minimum": 1 }, "stacks": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["target", "status", "turns"], "additionalProperties": false
+    },
+    {
+      "description": "Counts toward the cap of 2 spell-granted extra turns in a row",
+      "properties": { "op": { "const": "extra_turn" } },
+      "additionalProperties": false
+    }
+  ],
+  "$defs": {
+    "target": { "enum": ["self", "enemy"] },
+    "count": { "type": "integer", "minimum": 0 },
+    "color": { "enum": ["red", "blue", "green", "yellow"] },
+    "gem": { "enum": ["red", "blue", "green", "yellow", "skull", "action", "gold"] }
+  }
+}

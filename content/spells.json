@@ -1,0 +1,23 @@
+{
+  "spells": [
+    {
+      "id": "firebolt", "name": "Firebolt", "cost": { "red": 7 },
+      "effects": [{ "op": "damage_per_gem", "target": "enemy", "gem": "red", "per": 1 }]
+    },
+    {
+      "id": "tidal_shift", "name": "Tidal Shift", "cost": { "blue": 5 }, "cooldown": 2, "ends_turn": false,
+      "effects": [{ "op": "convert_gems", "from": "green", "to": "blue", "count": "all" }]
+    },
+    {
+      "id": "stone_barrier", "name": "Stone Barrier", "cost": { "green": 8 }, "cooldown": 2,
+      "effects": [{ "op": "apply_status", "target": "self", "status": "barrier", "turns": 3, "stacks": 10 }]
+    },
+    {
+      "id": "concussion", "name": "Concussion", "cost": { "yellow": 7, "red": 3 }, "cooldown": 3,
+      "effects": [
+        { "op": "damage", "target": "enemy", "amount": 3 },
+        { "op": "apply_status", "target": "enemy", "status": "stun", "turns": 1 }
+      ]
+    }
+  ]
+}
