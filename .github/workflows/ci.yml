@@ -28,4 +28,4 @@ jobs:
       - name: content_lint.gd
         run: godot --headless --script res://tools/content_lint.gd
       - name: GUT
-        run: godot --headless -s addons/gut/gut_cmdln.gd
+        run: tools/run_tests.sh

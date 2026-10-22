@@ -1,0 +1,6 @@
+{
+  "weapons": [
+    { "id": "sword", "name": "Sword", "ap_cost": 4, "effects": [{ "op": "damage", "target": "enemy", "amount": 5 }] },
+    { "id": "mace", "name": "Mace", "ap_cost": 6, "effects": [{ "op": "damage", "target": "enemy", "amount": 8 }] }
+  ]
+}

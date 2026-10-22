@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Classes. In M0 each is a fixed loadout: HP, mana caps, spells and a weapon",
+  "type": "object",
+  "required": ["classes"],
+  "additionalProperties": false,
+  "properties": {
+    "classes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "hp", "mana_cap", "spells", "weapon"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "name": { "type": "string" },
+          "hp": { "type": "integer", "minimum": 1 },
+          "mana_cap": {
+            "type": "object", "additionalProperties": false, "required": ["red", "blue", "green", "yellow"],
+            "properties": {
+              "red": { "type": "integer", "minimum": 0 }, "blue": { "type": "integer", "minimum": 0 },
+              "green": { "type": "integer", "minimum": 0 }, "yellow": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "spells": { "type": "array", "maxItems": 6, "uniqueItems": true, "items": { "type": "string" } },
+          "weapon": { "type": "string" }
+        }
+      }
+    }
+  }
+}

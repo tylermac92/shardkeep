@@ -21,7 +21,7 @@ Run what CI runs:
 
 ```sh
 godot --headless --import                              # once, after a fresh clone
-godot --headless -s addons/gut/gut_cmdln.gd            # GUT tests
+tools/run_tests.sh                                     # GUT tests (fails if a test script fails to load)
 godot --headless --script res://tools/content_lint.gd  # content reference checks
 tools/validate_content.sh                              # JSON Schema (pipx install check-jsonschema)
 tools/lint_engine.sh                                   # engine purity lint

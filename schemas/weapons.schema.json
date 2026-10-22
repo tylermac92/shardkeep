@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Weapons: spells paid with action points, used through Attack; always end the turn",
+  "type": "object",
+  "required": ["weapons"],
+  "additionalProperties": false,
+  "properties": {
+    "weapons": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "ap_cost", "effects"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "name": { "type": "string" },
+          "ap_cost": { "type": "integer", "minimum": 1 },
+          "effects": { "type": "array", "minItems": 1, "items": { "$ref": "effect.schema.json" } }
+        }
+      }
+    }
+  }
+}

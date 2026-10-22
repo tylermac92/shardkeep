@@ -11,45 +11,141 @@ class Outcome:
 	var events: Array[Dictionary] = []
 
 
-## A new battle with its board drawn from the setup stream. Sides start empty; the caller fills them.
-static func new_battle(battle_seed: int, content: ContentLoader) -> BattleState:
+## A new battle with its board drawn from the setup stream. class_ids, if given, equip
+## side 0 and side 1 from classes.json; otherwise the sides start empty for the caller to fill.
+static func new_battle(battle_seed: int, content: ContentLoader, class_ids: Array = []) -> BattleState:
 	var s := BattleState.new()
 	s.content = content
 	s.streams = Streams.new(battle_seed)
+	for i in class_ids.size():
+		var def: Dictionary = content.classes[class_ids[i]]
+		var side := s.sides[i]
+		side.hp = int(def.hp)
+		side.hp_max = side.hp
+		for color in MANA_KINDS.size():
+			side.mana_cap[color] = int(def.mana_cap[MANA_KINDS[color]])
+		for spell: String in def.spells:
+			side.spells.append(StringName(spell))
+		side.cooldowns.resize(side.spells.size())
+		side.weapon = StringName(def.weapon)
 	_fill_board(s, false)
 	return s
 
 
-## Every legal action for the active side: swaps of adjacent, unlocked gems that make a match.
+## Every legal action for the active side: matching swaps, castable spells and an affordable
+## attack, or just a pass when the side is stunned.
 static func legal_actions(state: BattleState) -> Array[Action]:
 	if state.result != BattleState.Result.ONGOING:
 		return []
-	return _swaps(state.board, false)
+	var me := state.sides[state.active_side]
+	if _is_stunned(state, me):
+		return [Action.pass_turn()]
+	var out := _swaps(state.board, false)
+	for i in me.spells.size():
+		if _can_cast(state, me, i):
+			out.append(Action.cast(me.spells[i]))
+	if _can_attack(state, me):
+		out.append(Action.attack())
+	return out
 
 
 ## Runs one action. Returns null, and changes nothing, if the action isn't legal.
 static func apply(state: BattleState, action: Action) -> Outcome:
-	if state.result != BattleState.Result.ONGOING or action.kind != Action.Kind.SWAP or not _adjacent(action.a, action.b):
+	if state.result != BattleState.Result.ONGOING:
 		return null
 	var s := state.clone()
-	if not _swap_matches(s.board, action.a, action.b):
+	var side := s.active_side
+	var me := s.sides[side]
+	if _is_stunned(s, me) != (action.kind == Action.Kind.PASS):
 		return null
 	var out := Outcome.new()
 	out.state = s
-	_swap_cells(s.board, action.a, action.b)
-	out.events.append({type = "swapped", a = action.a, b = action.b})
-	var extra_turn := cascade(s, out.events, PackedInt32Array([action.a, action.b]))
+	var match_extra := false
+	var spell_extra := false
+	var ends_turn := true
+	match action.kind:
+		Action.Kind.SWAP:
+			if not _adjacent(action.a, action.b) or not _swap_matches(s.board, action.a, action.b):
+				return null
+			_swap_cells(s.board, action.a, action.b)
+			out.events.append({type = "swapped", a = action.a, b = action.b})
+			match_extra = cascade(s, out.events, PackedInt32Array([action.a, action.b]))
+		Action.Kind.CAST:
+			var i := me.spells.find(action.spell)
+			if i < 0 or not _can_cast(s, me, i):
+				return null
+			var def: Dictionary = s.content.spells[action.spell]
+			for color in MANA_KINDS.size():
+				var cost := int(def.cost.get(MANA_KINDS[color], 0))
+				me.mana[color] -= cost
+				_changed(out.events, side, MANA_KINDS[color], -cost)
+			var cooldown := int(def.get("cooldown", 0))
+			# +1 because the end of this turn ticks it too; it then blocks the next `cooldown` own turns.
+			me.cooldowns[i] = cooldown + 1 if cooldown > 0 else 0
+			out.events.append({type = "spell_cast", side = side, spell = action.spell})
+			spell_extra = EffectRunner.run(s, def.effects, side, out.events)
+			if s.result == BattleState.Result.ONGOING:
+				match_extra = cascade(s, out.events)
+			ends_turn = def.get("ends_turn", true)
+		Action.Kind.ATTACK:
+			if not _can_attack(s, me):
+				return null
+			var def: Dictionary = s.content.weapons[me.weapon]
+			var ap_cost := int(def.ap_cost)
+			me.action_points -= ap_cost
+			_changed(out.events, side, "ap", -ap_cost)
+			out.events.append({type = "spell_cast", side = side, spell = me.weapon})
+			spell_extra = EffectRunner.run(s, def.effects, side, out.events)
+			if s.result == BattleState.Result.ONGOING:
+				match_extra = cascade(s, out.events)
 	if s.result != BattleState.Result.ONGOING:
 		return out
-	if extra_turn:
-		out.events.append({type = "extra_turn", side = s.active_side, reason = "match"})
+	if not ends_turn:
+		pass  # a spell that doesn't end the turn: the same side acts again, swap included
+	elif match_extra or spell_extra:
+		out.events.append({type = "extra_turn", side = side, reason = "match" if match_extra else "spell"})
 	else:
-		s.active_side = 1 - s.active_side
-		s.turn += 1
-		out.events.append({type = "turn_passed", to_side = s.active_side})
+		_end_turn(s, out.events)
+		if s.result != BattleState.Result.ONGOING:
+			return out
 	if _swaps(s.board, true).is_empty():
 		reshuffle(s, out.events)
 	return out
+
+
+## Deals damage to a side. Barrier soaks it up first; a knockout ends the battle, and if both
+## sides are down the acting side loses.
+static func damage(s: BattleState, target: int, amount: int, events: Array[Dictionary]) -> void:
+	var side := s.sides[target]
+	for st in side.statuses.duplicate():
+		if amount > 0 and s.content.statuses[st.id].get("absorbs_damage", false):
+			var soaked := mini(st.stacks, amount)
+			st.stacks -= soaked
+			amount -= soaked
+			events.append({type = "damage_absorbed", side = target, status = st.id, amount = soaked})
+			if st.stacks <= 0:
+				side.statuses.erase(st)
+				events.append({type = "status_expired", side = target, status = st.id})
+	var dmg := mini(amount, side.hp)
+	side.hp -= dmg
+	_changed(events, target, "hp", -dmg)
+	var me := s.active_side
+	var winner := -1
+	if s.sides[me].hp <= 0:
+		winner = 1 - me
+	elif s.sides[1 - me].hp <= 0:
+		winner = me
+	if winner >= 0:
+		s.result = BattleState.Result.SIDE0_WON if winner == 0 else BattleState.Result.SIDE1_WON
+		events.append({type = "battle_ended", winner = winner})
+
+
+## Adds mana up to the pool's cap.
+static func gain_mana(s: BattleState, target: int, color: int, amount: int, events: Array[Dictionary]) -> void:
+	var side := s.sides[target]
+	var gain := clampi(side.mana_cap[color] - side.mana[color], 0, amount)
+	side.mana[color] += gain
+	_changed(events, target, MANA_KINDS[color], gain)
 
 
 ## Match, pay the active side, clear (with blasts), place new specials, fall and refill,
@@ -154,34 +250,15 @@ static func _pay(s: BattleState, gem: int, count: int, events: Array[Dictionary]
 	var me := s.sides[side]
 	match def.reward:
 		"mana":
-			var gain := clampi(me.mana_cap[gem] - me.mana[gem], 0, amount)
-			me.mana[gem] += gain
-			_changed(events, side, MANA_KINDS[gem], gain)
+			gain_mana(s, side, gem, amount, events)
 		"damage":
-			_damage(s, 1 - side, amount, events)
+			damage(s, 1 - side, amount, events)
 		"ap":
 			me.action_points += amount
 			_changed(events, side, "ap", amount)
 		"gold":
 			me.gold_gained += amount
 			_changed(events, side, "gold", amount)
-
-
-## Deals damage and ends the battle on a knockout. If both sides are down, the acting side loses.
-static func _damage(s: BattleState, target: int, amount: int, events: Array[Dictionary]) -> void:
-	var side := s.sides[target]
-	var dmg := mini(amount, side.hp)
-	side.hp -= dmg
-	_changed(events, target, "hp", -dmg)
-	var me := s.active_side
-	var winner := -1
-	if s.sides[me].hp <= 0:
-		winner = 1 - me
-	elif s.sides[1 - me].hp <= 0:
-		winner = me
-	if winner >= 0:
-		s.result = BattleState.Result.SIDE0_WON if winner == 0 else BattleState.Result.SIDE1_WON
-		events.append({type = "battle_ended", winner = winner})
 
 
 ## Sets off every BURST and SKULL_BOMB among the cleared cells, chaining into specials they hit.
@@ -217,7 +294,7 @@ static func _blast(s: BattleState, cleared: PackedInt32Array, hit: Dictionary, e
 				if s.result != BattleState.Result.ONGOING:
 					return false
 		if bomb:
-			_damage(s, 1 - s.active_side, s.content.skull_bomb_damage, events)
+			damage(s, 1 - s.active_side, s.content.skull_bomb_damage, events)
 			if s.result != BattleState.Result.ONGOING:
 				return false
 	return true
@@ -246,6 +323,52 @@ static func _place_special(s: BattleState, g: Matcher.Group, swapped: PackedInt3
 			b.gems[cell] = Board.Gem.SKULL
 			b.special[cell] = Board.Special.SKULL_BOMB
 	events.append({type = "special_created", cell = cell, kind = g.creates, gem = b.gems[cell]})
+
+
+## Ends the active side's turn: its cooldowns and statuses tick down, then the other side's
+## turn starts with its on_turn_start statuses (which can end the battle).
+static func _end_turn(s: BattleState, events: Array[Dictionary]) -> void:
+	var me := s.sides[s.active_side]
+	for i in me.cooldowns.size():
+		me.cooldowns[i] = maxi(me.cooldowns[i] - 1, 0)
+	for st in me.statuses.duplicate():
+		st.turns -= 1
+		if st.turns <= 0:
+			me.statuses.erase(st)
+			events.append({type = "status_expired", side = s.active_side, status = st.id})
+	s.active_side = 1 - s.active_side
+	s.turn += 1
+	s.extra_turn_chain = 0
+	events.append({type = "turn_passed", to_side = s.active_side})
+	var next := s.sides[s.active_side]
+	next.stunned_last_turn = _is_stunned(s, next)
+	for st in next.statuses.duplicate():
+		var hook: Array = s.content.statuses[st.id].get("on_turn_start", [])
+		if not hook.is_empty():
+			EffectRunner.run(s, hook, s.active_side, events)
+			if s.result != BattleState.Result.ONGOING:
+				return
+
+
+static func _is_stunned(s: BattleState, side: SideState) -> bool:
+	for st in side.statuses:
+		if s.content.statuses[st.id].get("skips_turn", false):
+			return true
+	return false
+
+
+static func _can_cast(s: BattleState, me: SideState, i: int) -> bool:
+	if me.cooldowns[i] > 0:
+		return false
+	var cost: Dictionary = s.content.spells[me.spells[i]].cost
+	for color in MANA_KINDS.size():
+		if me.mana[color] < int(cost.get(MANA_KINDS[color], 0)):
+			return false
+	return true
+
+
+static func _can_attack(s: BattleState, me: SideState) -> bool:
+	return me.weapon != &"" and me.action_points >= int(s.content.weapons[me.weapon].ap_cost)
 
 
 static func _changed(events: Array[Dictionary], side: int, kind: String, delta: int) -> void:

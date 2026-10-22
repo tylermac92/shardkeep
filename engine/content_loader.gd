@@ -15,6 +15,11 @@ var gem_weights := PackedInt32Array()
 var gem_defs: Array = []
 ## Bonus damage when a SKULL_BOMB goes off.
 var skull_bomb_damage := 0
+## Definitions by id, straight from spells.json, weapons.json, statuses.json and classes.json.
+var spells := {}
+var weapons := {}
+var statuses := {}
+var classes := {}
 
 
 ## Loads every content file. Returns an empty list on success, else one line per problem.
@@ -36,6 +41,10 @@ func load_all(dir: String = CONTENT_DIR) -> PackedStringArray:
 				gem_defs[i] = gem
 	elif errors.is_empty():
 		errors.append("gems.json: expected an object with a \"gems\" array")
+	spells = _read_list(dir, "spells", errors)
+	weapons = _read_list(dir, "weapons", errors)
+	statuses = _read_list(dir, "statuses", errors)
+	classes = _read_list(dir, "classes", errors)
 	return errors
 
 
@@ -54,7 +63,46 @@ func validate() -> PackedStringArray:
 		total += int(gem.get("spawn_weight", 0))
 	if total <= 0:
 		errors.append("gems.json: spawn weights must add up to more than 0")
+	for id in spells:
+		_check_effects("spells.json", id, spells[id].get("effects", []), errors)
+	for id in weapons:
+		_check_effects("weapons.json", id, weapons[id].get("effects", []), errors)
+	for id in statuses:
+		_check_effects("statuses.json", id, statuses[id].get("on_turn_start", []), errors)
+	for id in classes:
+		for spell in classes[id].get("spells", []):
+			if not spells.has(spell):
+				errors.append("classes.json: %s lists unknown spell \"%s\"" % [id, spell])
+		if not weapons.has(classes[id].get("weapon", "")):
+			errors.append("classes.json: %s has unknown weapon \"%s\"" % [id, classes[id].get("weapon", "")])
 	return errors
+
+
+func _check_effects(file: String, id: String, effects: Array, errors: PackedStringArray) -> void:
+	for e: Dictionary in effects:
+		var op: String = e.get("op", "")
+		if not EffectRunner.OPS.has(op):
+			errors.append("%s: %s uses unknown effect op \"%s\"" % [file, id, op])
+		elif op == "apply_status" and not statuses.has(e.get("status", "")):
+			errors.append("%s: %s applies unknown status \"%s\"" % [file, id, e.get("status", "")])
+
+
+## Reads <dir>/<key>.json, an object with a <key> array of definitions, into a dictionary by id.
+func _read_list(dir: String, key: String, errors: PackedStringArray) -> Dictionary:
+	var out := {}
+	var data: Variant = _read_json(dir.path_join(key + ".json"), errors)
+	if data == null:
+		return out
+	if not (data is Dictionary and data.get(key) is Array):
+		errors.append("%s.json: expected an object with a \"%s\" array" % [key, key])
+		return out
+	for def in data[key]:
+		var id: String = def.get("id", "") if def is Dictionary else ""
+		if id.is_empty() or out.has(id):
+			errors.append("%s.json: missing or duplicate id \"%s\"" % [key, id])
+		else:
+			out[id] = def
+	return out
 
 
 func _read_json(path: String, errors: PackedStringArray) -> Variant:

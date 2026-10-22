@@ -1,0 +1,7 @@
+{
+  "statuses": [
+    { "id": "stun", "name": "Stun", "skips_turn": true },
+    { "id": "burn", "name": "Burn", "on_turn_start": [{ "op": "damage", "target": "self", "amount": 2 }] },
+    { "id": "barrier", "name": "Barrier", "absorbs_damage": true }
+  ]
+}

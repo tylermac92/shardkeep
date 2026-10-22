@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Spells: mana cost, cooldown and effects",
+  "type": "object",
+  "required": ["spells"],
+  "additionalProperties": false,
+  "properties": {
+    "spells": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "cost", "effects"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "name": { "type": "string" },
+          "cost": {
+            "type": "object", "additionalProperties": false, "minProperties": 1,
+            "properties": {
+              "red": { "type": "integer", "minimum": 0 }, "blue": { "type": "integer", "minimum": 0 },
+              "green": { "type": "integer", "minimum": 0 }, "yellow": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "cooldown": { "description": "Own turns the spell is unavailable after casting; default 0", "type": "integer", "minimum": 0 },
+          "ends_turn": { "description": "Default true", "type": "boolean" },
+          "effects": { "type": "array", "minItems": 1, "items": { "$ref": "effect.schema.json" } }
+        }
+      }
+    }
+  }
+}
