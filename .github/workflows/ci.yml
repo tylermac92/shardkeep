@@ -31,3 +31,22 @@ jobs:
         run: tools/run_tests.sh
       - name: AI benchmark (smoke run; the full run is 200 positions)
         run: godot --headless --script res://tools/benchmark.gd -- --positions 5
+
+  fuzz:
+    runs-on: ubuntu-24.04
+    container: barichello/godot-ci:4.7.2
+    # 10,000 Easy-AI actions take several minutes, so they run beside the main job.
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Import project
+        run: godot --headless --import
+      - name: Fuzz 10,000 actions
+        run: godot --headless --script res://tools/fuzz.gd -- --actions 10000 --out "$GITHUB_WORKSPACE/fuzz_failures"
+      - name: Upload the failing battle as a replay
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-failure
+          path: fuzz_failures/
+          if-no-files-found: ignore

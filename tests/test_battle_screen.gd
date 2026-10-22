@@ -254,3 +254,28 @@ func _mouse_button(at: Vector2, pressed: bool) -> void:
 	e.position = at
 	e.global_position = at
 	get_viewport().push_input(e)
+
+
+func test_f9_exports_a_replay_of_the_battle_so_far() -> void:
+	var b := await _screen()
+	b.min_think_msec = 0
+	b.player.speed = EventPlayer.Speed.INSTANT
+	b.start_battle(77, AI.Level.EASY)
+	for i in 3:
+		await _settled(b)
+		var a := AI.choose(b.state, AI.Level.EASY)
+		if a.kind == Action.Kind.SWAP:
+			_click(_center(b, a.a))
+			_click(_center(b, a.b))
+		else:
+			_click_button(b.spell_bar.button(a.spell))
+	await _settled(b)
+	var key := InputEventKey.new()
+	key.keycode = KEY_F9
+	key.pressed = true
+	get_viewport().push_input(key)
+	assert_string_contains(b._message.text, "Replay saved to")
+	var path := "%s/battle_77_%d.json" % [BattleController.EXPORT_DIR, b._history.size()]
+	var r := Replay.play(JSON.parse_string(FileAccess.get_file_as_string(path)), ContentDB.content)
+	assert_eq(r.error, "")
+	assert_eq(r.state.state_hash(), b.state.state_hash())
