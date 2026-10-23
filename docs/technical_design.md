@@ -330,14 +330,14 @@ M0 answers two questions before any content work: is a battle on the shared boar
 - [x] At least 30 GUT tests, including golden boards for every group shape, and 3 replay fixtures
 - [x] Fuzz test runs 10,000 turns with zero invariant failures
 - [x] Balance runner completes 1,000 Easy-vs-Easy battles headless and writes the CSV, including first-mover win rate
-- [ ] Measured and recorded in this doc: average `apply()` time, plus Normal and Hard AI decision times (Hard as a benchmark only, not yet playable), on a desktop PC and the slowest target machine
-- [ ] Fun check: 30 battles played by you, with short notes on what felt good and what felt bad
+- [ ] Measured and recorded in this doc: average `apply()` time, plus Normal and Hard AI decision times (Hard as a benchmark only, not yet playable), on a desktop PC and the slowest target machine *(cloud sandbox only; skipped on real machines, see [M0 results](#m0-results))*
+- [ ] Fun check: 30 battles played by you, with short notes on what felt good and what felt bad *(skipped)*
 
 **Exit decision.** If the fun check is positive and the Hard benchmark fits its 250 ms budget, move on to M1 (classes, levels 1–10, the full status set, playable Hard AI). If Hard misses budget even with a smaller beam, port the engine to C# before M1. If the battles aren't fun, tune board rules (gem weights, skull damage, extra-turn rules) and repeat the fun check before adding content.
 
 ## M0 results
 
-Recorded Oct 22, 2026. Rows marked *to measure* need your machines or your play; the exit decision waits on them.
+Recorded Oct 22–23, 2026. The fun check and the real-machine benchmarks were skipped; the exit decision was made without them.
 
 ### Speed
 
@@ -346,8 +346,8 @@ Recorded Oct 22, 2026. Rows marked *to measure* need your machines or your play;
 | Machine | `apply()` | Easy | Normal | Hard, beam 6 | Hard, beam 4 | Hard, beam 3 |
 | --- | --- | --- | --- | --- | --- | --- |
 | Cloud sandbox: Xeon 2.1 GHz, 4 cores, Godot 4.7.2 editor build | 0.72 | 14 / 124 | 119 / 991 | 316 / 965 | 171 / 454 | 101 / 310 |
-| Desktop PC | *to measure* | | | | | |
-| Slowest target (Steam Deck) | *to measure* | | | | | |
+| Desktop PC | *not measured* | | | | | |
+| Slowest target (Steam Deck) | *not measured* | | | | | |
 
 The beam is `AI.BEAM` in `engine/ai.gd` (6 today). Hard at beam 6 misses the 250 ms budget on the sandbox; beam 4 fits it on average but not in the worst case. A T10 change to swap checks cut Hard from 951 ms to 316 ms with identical results, so profiling found real headroom before any port.
 
@@ -390,19 +390,21 @@ The two loadouts are placeholders, so these are tuning inputs for M1's real clas
 
 ### Fun check
 
-*To do:* 30 battles across both loadouts and both difficulties, with one line on what felt good and one on what felt bad after each. The win and loss screen saves the notes; [fun_check.md](fun_check.md) has the template and where the file lands.
-
-Three most common complaints: *to fill in after the fun check.*
+Skipped. The notes form on the win and loss screen and [fun_check.md](fun_check.md) stay in place for a later playtest.
 
 ### Exit decision
 
-*Pending* the fun check and the target-machine benchmark.
+Decided Oct 23, 2026 by the project owner: **move to M1**, without the fun check or the real-machine benchmarks.
 
-- [ ] Move to M1
+- [x] Move to M1
 - [ ] Port the engine to C#
 - [ ] Tune board rules and repeat the fun check
 
-Provisional reading of the data so far: no C# port yet. The design's rule is to shrink the beam first, and beam 4 already fits 250 ms on average on the sandbox; if the Steam Deck confirms that, set `AI.BEAM` to 4. Whether to move to M1 or tune board rules first depends on the fun check.
+Open risks carried into M1:
+
+- **Hard's speed is unproven on target hardware.** M1 makes Hard playable. On the sandbox, beam 6 misses the 250 ms budget and beam 4 fits on average; measure on the Steam Deck before shipping Hard, and shrink the beam (or port to C#) if it misses.
+- **Fun is unverified.** No one has played 30 battles yet, so board-rule problems may surface once M1's real classes are in.
+- **The balance flags above are still open**, to be tuned with M1's real classes rather than the M0 placeholders.
 
 ## Decisions
 
