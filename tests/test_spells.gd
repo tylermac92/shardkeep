@@ -35,6 +35,7 @@ func test_too_little_mana_or_cooldown_keeps_a_spell_out_of_legal_actions() -> vo
 
 func test_cooldown_blocks_the_next_two_own_turns() -> void:
 	var s := Rules.new_battle(5, Fixtures.test_content, ["loadout_a", "loadout_b"])
+	s.active_side = 0  # whoever the seed picked, side 0 acts first here
 	s.sides[0].mana = PackedInt32Array([0, 20, 0, 0])
 	s = act(s, Action.cast(&"tidal_shift")).state  # cooldown 2; doesn't end the turn
 	var castable := []  # at the start of each of side 0's next turns

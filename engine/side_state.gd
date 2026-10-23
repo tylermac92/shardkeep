@@ -16,6 +16,9 @@ var weapon: StringName = &""
 var statuses: Array[Dictionary] = []
 ## Whether this side's most recent turn was skipped by stun, which blocks the next stun.
 var stunned_last_turn := false
+## Stat points, indexed by Stat. Mastery comes first so stats[color] is that color's mastery.
+enum Stat { RED, BLUE, GREEN, YELLOW, MIGHT, VITALITY, CUNNING }
+var stats := PackedInt32Array([0, 0, 0, 0, 0, 0, 0])
 
 
 func clone() -> SideState:
@@ -31,6 +34,7 @@ func clone() -> SideState:
 	c.weapon = weapon
 	c.statuses = statuses.duplicate(true)
 	c.stunned_last_turn = stunned_last_turn
+	c.stats = stats.duplicate()
 	return c
 
 
@@ -38,7 +42,7 @@ func clone() -> SideState:
 func serialize(buf: StreamPeerBuffer) -> void:
 	for v in [hp, hp_max, action_points, gold_gained, int(stunned_last_turn)]:
 		buf.put_64(v)
-	for ints: PackedInt32Array in [mana, mana_cap, cooldowns]:
+	for ints: PackedInt32Array in [mana, mana_cap, cooldowns, stats]:
 		buf.put_32(ints.size())
 		buf.put_data(ints.to_byte_array())
 	buf.put_32(spells.size())

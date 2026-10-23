@@ -88,7 +88,7 @@ func test_clicks_during_playback_or_the_ai_turn_do_nothing() -> void:
 func test_illegal_swap_snaps_back() -> void:
 	var b := await _screen()
 	b.player.speed = EventPlayer.Speed.INSTANT
-	b.start_battle(3, AI.Level.EASY)
+	b.start_battle(_seed_with_a_plain_first_move(), AI.Level.EASY)
 	var legal := Rules.legal_actions(b.state)
 	var illegal := -1
 	for c in Board.CELLS - 1:
@@ -168,12 +168,13 @@ func _screen() -> BattleController:
 	return b
 
 
-## A battle seed whose first Easy move is a swap that ends the turn, so the AI moves next.
+## A battle seed where the player moves first and Easy's first move is a swap that ends the
+## turn, so the AI moves next.
 func _seed_with_a_plain_first_move() -> int:
 	for n in 100:
 		var s := Rules.new_battle(n, ContentDB.content, BattleController.LOADOUTS)
 		var a := AI.choose(s, AI.Level.EASY)
-		if a.kind == Action.Kind.SWAP and Rules.apply(s, a).state.active_side == 1:
+		if s.active_side == 0 and a.kind == Action.Kind.SWAP and Rules.apply(s, a).state.active_side == 1:
 			return n
 	return -1
 

@@ -1,0 +1,8 @@
+{
+  "vitality_hp": 5,
+  "might_damage": 1,
+  "mastery_points_per_mana": 3,
+  "mastery_extra_turn_percent": 2,
+  "cunning_resist_percent": 3,
+  "max_chance_percent": 50
+}

@@ -133,7 +133,8 @@ func test_mana_toward_a_spell_is_worth_more() -> void:
 	assert_gt(AI.score(s, after, 0, AI.DEFAULT_WEIGHTS), AI.score(s, spare, 0, AI.DEFAULT_WEIGHTS))
 
 
-## A copy of s whose skyfall streams show the same ghost row but differ in the gem after it.
+## A copy of s whose skyfall streams show the same ghost row but differ in the gem after it,
+## and whose effects stream (mastery and resist rolls) is somewhere else entirely.
 func _same_ghost_row_different_future(s: BattleState) -> BattleState:
 	var other := s.clone()
 	for x in Board.SIZE:
@@ -143,6 +144,7 @@ func _same_ghost_row_different_future(s: BattleState) -> BattleState:
 		while _gem_at(s, col, m) != _gem_at(s, col, n) or _gem_at(s, col, m + 1) == _gem_at(s, col, n + 1):
 			m += 1
 		other.streams.draws[col] = m
+	other.streams.draws[Streams.EFFECTS] += 1000  # hidden rolls (mastery, resist) differ too
 	return other
 
 

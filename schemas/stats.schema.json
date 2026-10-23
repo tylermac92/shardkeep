@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "What one stat point is worth in battle",
+  "type": "object",
+  "required": ["vitality_hp", "might_damage", "mastery_points_per_mana", "mastery_extra_turn_percent", "cunning_resist_percent", "max_chance_percent"],
+  "additionalProperties": false,
+  "properties": {
+    "vitality_hp": { "description": "Max HP per point of Vitality.", "type": "integer", "minimum": 0 },
+    "might_damage": { "description": "Damage per point of Might added to each skull match, skull bomb and weapon swing.", "type": "integer", "minimum": 0 },
+    "mastery_points_per_mana": { "description": "Mastery points per bonus mana on each match of that color (rounded down).", "type": "integer", "minimum": 1 },
+    "mastery_extra_turn_percent": { "description": "Chance per mastery point that a match of that color grants an extra turn.", "type": "integer", "minimum": 0 },
+    "cunning_resist_percent": { "description": "Chance per point of Cunning to resist an enemy's resistible status.", "type": "integer", "minimum": 0 },
+    "max_chance_percent": { "description": "Cap on any stat-driven chance.", "type": "integer", "minimum": 0, "maximum": 100 }
+  }
+}

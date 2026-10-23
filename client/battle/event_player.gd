@@ -57,6 +57,10 @@ func play(events: Array[Dictionary]) -> void:
 				message.emit("%s on %s for %d turns" % [content.statuses[e.status].name, _who(e.side).to_lower(), e.turns])
 			"status_blocked":
 				message.emit("%s can't be stunned twice in a row" % _who(e.side))
+			"status_resisted":
+				message.emit("%s resisted %s" % [_who(e.side), content.statuses[e.status].name])
+			"mastery_extra_turn":
+				message.emit("Mastery: extra turn for %s" % _who(e.side).to_lower())
 		if tw:
 			await tw.finished
 			board.end_step()

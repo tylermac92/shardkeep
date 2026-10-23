@@ -17,6 +17,8 @@ var gem_defs: Array = []
 var skull_bomb_damage := 0
 ## Mana of each color the side that moves second starts with, against the first-mover edge.
 var second_mover_mana := 0
+## What one stat point is worth (content/stats.json): vitality_hp, might_damage, and so on.
+var stat_rules := {}
 ## Definitions by id, straight from spells.json, weapons.json, statuses.json and classes.json.
 var spells := {}
 var weapons := {}
@@ -48,6 +50,11 @@ func load_all(dir: String = CONTENT_DIR) -> PackedStringArray:
 	weapons = _read_list(dir, "weapons", errors)
 	statuses = _read_list(dir, "statuses", errors)
 	classes = _read_list(dir, "classes", errors)
+	var rules: Variant = _read_json(dir.path_join("stats.json"), errors)
+	if rules is Dictionary:
+		stat_rules = rules
+	elif rules != null:
+		errors.append("stats.json: expected an object")
 	return errors
 
 
