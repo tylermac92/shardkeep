@@ -20,7 +20,7 @@ func test_duplicate_gem_id_fails_validation() -> void:
 
 
 func test_missing_content_dir_reports_error() -> void:
-	assert_eq(ContentLoader.new().load_all("res://no_such_dir").size(), 5, "one error per content file")
+	assert_eq(ContentLoader.new().load_all("res://no_such_dir").size(), 6, "one error per content file")
 
 
 func test_content_db_autoload_has_gems() -> void:

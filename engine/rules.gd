@@ -29,9 +29,22 @@ static func new_battle(battle_seed: int, content: ContentLoader, loadouts: Array
 			side.spells.append(StringName(spell))
 		side.cooldowns.resize(side.spells.size())
 		side.weapon = StringName(def.weapon)
-	for color in MANA_KINDS.size():  # side 0 moves first; side 1 gets the head start
-		s.sides[1].mana[color] = mini(content.second_mover_mana, s.sides[1].mana_cap[color])
+		var st: Dictionary = def.get("stats", {})
+		for color in MANA_KINDS.size():
+			side.stats[color] = int(st.get("mastery", {}).get(MANA_KINDS[color], 0))
+		side.stats[SideState.Stat.MIGHT] = int(st.get("might", 0))
+		side.stats[SideState.Stat.VITALITY] = int(st.get("vitality", 0))
+		side.stats[SideState.Stat.CUNNING] = int(st.get("cunning", 0))
+		side.hp_max += side.stats[SideState.Stat.VITALITY] * _rule(s, "vitality_hp")
+		side.hp = side.hp_max
 	_fill_board(s, false)
+	# Higher Cunning moves first; a tie goes by the seed (drawn after the board, so boards don't depend on it).
+	var c0 := s.sides[0].stats[SideState.Stat.CUNNING]
+	var c1 := s.sides[1].stats[SideState.Stat.CUNNING]
+	s.active_side = 0 if c0 > c1 else 1 if c1 > c0 else s.streams.next_int(Streams.SETUP) % 2
+	var second := s.sides[1 - s.active_side]
+	for color in MANA_KINDS.size():
+		second.mana[color] = mini(content.second_mover_mana, second.mana_cap[color])
 	return s
 
 
@@ -98,7 +111,8 @@ static func apply(state: BattleState, action: Action) -> Outcome:
 			me.action_points -= ap_cost
 			_changed(out.events, side, "ap", -ap_cost)
 			out.events.append({type = "spell_cast", side = side, spell = me.weapon})
-			spell_extra = EffectRunner.run(s, def.effects, side, out.events)
+			var might := me.stats[SideState.Stat.MIGHT] * _rule(s, "might_damage")
+			spell_extra = EffectRunner.run(s, def.effects, side, out.events, might)
 			if s.result == BattleState.Result.ONGOING:
 				match_extra = cascade(s, out.events)
 	if s.result != BattleState.Result.ONGOING:
@@ -124,6 +138,22 @@ static func ghost_row(state: BattleState) -> PackedByteArray:
 	for x in Board.SIZE:
 		out.append(peek.next_weighted(Streams.COL_0 + x, state.content.gem_weights))
 	return out
+
+
+## Whether a percent chance comes up, rolled on the effects stream. In AI search the roll is
+## hidden information, so it isn't read: the likelier outcome is taken instead.
+static func roll(s: BattleState, percent: int) -> bool:
+	percent = mini(percent, _rule(s, "max_chance_percent"))
+	if percent <= 0:
+		return false
+	if not s.sim_draw_budget.is_empty():
+		return percent >= 50  # shortcut: rounds the chance, fine while chances stay at or below the cap of 50
+	return s.streams.next_int(Streams.EFFECTS) % 100 < percent
+
+
+## What one stat point is worth (content/stats.json); 0 if the content doesn't say.
+static func _rule(s: BattleState, key: String) -> int:
+	return int(s.content.stat_rules.get(key, 0))
 
 
 ## Deals damage to a side. Barrier soaks it up first; a knockout ends the battle, and if both
@@ -181,9 +211,19 @@ static func cascade(s: BattleState, events: Array[Dictionary], swapped := Packed
 				hit[c] = true
 				if b.gems[c] == Board.Gem.WILD:
 					wild = 2
-			_pay(s, g.gem, g.cells.size() * wild, events)
+			var me := s.sides[s.active_side]
+			var bonus := 0
+			if g.gem <= Board.Gem.YELLOW:
+				bonus = me.stats[g.gem] / maxi(_rule(s, "mastery_points_per_mana"), 1)
+			elif g.gem == Board.Gem.SKULL:
+				bonus = me.stats[SideState.Stat.MIGHT] * _rule(s, "might_damage")
+			_pay(s, g.gem, g.cells.size() * wild, events, bonus)
 			if s.result != BattleState.Result.ONGOING:
 				return extra_turn
+			if not extra_turn and not g.extra_turn and g.gem <= Board.Gem.YELLOW \
+					and roll(s, me.stats[g.gem] * _rule(s, "mastery_extra_turn_percent")):
+				events.append({type = "mastery_extra_turn", side = s.active_side, gem = g.gem})
+				extra_turn = true
 			extra_turn = extra_turn or g.extra_turn
 		var matched := PackedInt32Array(hit.keys())
 		matched.sort()
@@ -261,10 +301,11 @@ static func fall_and_refill(s: BattleState, events: Array[Dictionary]) -> void:
 		events.append({type = "spawned", cells = spawned_cells, gems = spawned_gems})
 
 
-## Pays count gems of one type to the active side (skull damage hits the other side).
-static func _pay(s: BattleState, gem: int, count: int, events: Array[Dictionary]) -> void:
+## Pays count gems of one type to the active side (skull damage hits the other side), plus a
+## flat bonus (mastery mana or Might damage).
+static func _pay(s: BattleState, gem: int, count: int, events: Array[Dictionary], bonus := 0) -> void:
 	var def: Dictionary = s.content.gem_defs[gem]
-	var amount: int = int(def.amount) * count
+	var amount: int = int(def.amount) * count + bonus
 	var side := s.active_side
 	var me := s.sides[side]
 	match def.reward:
@@ -313,7 +354,8 @@ static func _blast(s: BattleState, cleared: PackedInt32Array, hit: Dictionary, e
 				if s.result != BattleState.Result.ONGOING:
 					return false
 		if bomb:
-			damage(s, 1 - s.active_side, s.content.skull_bomb_damage, events)
+			var might := s.sides[s.active_side].stats[SideState.Stat.MIGHT] * _rule(s, "might_damage")
+			damage(s, 1 - s.active_side, s.content.skull_bomb_damage + might, events)
 			if s.result != BattleState.Result.ONGOING:
 				return false
 	return true

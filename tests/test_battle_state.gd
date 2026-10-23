@@ -70,6 +70,7 @@ func test_state_hash_is_canonical() -> void:
 		func(c: BattleState) -> void: c.sides[1].mana[2] += 1,
 		func(c: BattleState) -> void: c.sides[0].statuses.append({id = "burn", turns = 1, stacks = 1}),
 		func(c: BattleState) -> void: c.sides[0].stunned_last_turn = true,
+		func(c: BattleState) -> void: c.sides[1].stats[SideState.Stat.CUNNING] += 1,
 	]
 	for change in changes:
 		var c := s.clone()

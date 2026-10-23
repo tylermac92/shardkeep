@@ -4,12 +4,14 @@
       "id": "loadout_a", "name": "Loadout A", "hp": 50,
       "mana_cap": { "red": 20, "blue": 20, "green": 20, "yellow": 20 },
       "spells": ["firebolt", "tidal_shift"], "weapon": "sword",
+      "stats": { "might": 1, "vitality": 0, "cunning": 2, "mastery": { "red": 3, "blue": 3 } },
       "ai": { "weights": { "damage": 1.2 } }
     },
     {
       "id": "loadout_b", "name": "Loadout B", "hp": 50,
       "mana_cap": { "red": 20, "blue": 20, "green": 20, "yellow": 20 },
       "spells": ["stone_barrier", "concussion"], "weapon": "mace",
+      "stats": { "might": 2, "vitality": 2, "cunning": 2, "mastery": { "green": 3, "yellow": 3 } },
       "ai": { "weights": { "mana": 0.6, "status": 1.2 } }
     }
   ]

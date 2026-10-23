@@ -94,7 +94,7 @@ static func check(s: BattleState) -> String:
 	return ""
 
 
-## A random loadout from the real content: HP, mana caps, any of the spells, maybe a weapon.
+## A random loadout from the real content: HP, mana caps, stats, any of the spells, maybe a weapon.
 static func random_loadout(content: ContentLoader, base_seed: int, n: int) -> Dictionary:
 	var rolls := PackedInt64Array()
 	for k in 16:
@@ -109,7 +109,11 @@ static func random_loadout(content: ContentLoader, base_seed: int, n: int) -> Di
 			spells.append(str(ids[i]))
 	var weapons := content.weapons.keys()
 	var weapon := "" if rolls[13] % 4 == 0 else str(weapons[rolls[14] % weapons.size()])
-	return {"hp": 20 + rolls[15] % 41, "mana_cap": caps, "spells": spells, "weapon": weapon}
+	var mastery := {}
+	for i in Rules.MANA_KINDS.size():
+		mastery[Rules.MANA_KINDS[i]] = (rolls[i] >> 8) % 8
+	var stats := {"might": (rolls[13] >> 8) % 5, "vitality": (rolls[14] >> 8) % 5, "cunning": (rolls[15] >> 8) % 6, "mastery": mastery}
+	return {"hp": 20 + rolls[15] % 41, "mana_cap": caps, "spells": spells, "weapon": weapon, "stats": stats}
 
 
 static func _save_failure(out_dir: String, battle_seed: int, loadouts: Array, actions: Array[Action], failed: Action, error: String, content: ContentLoader) -> String:

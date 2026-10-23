@@ -237,7 +237,7 @@ Content lives as JSON under `res://content/`, one file per type, loaded once at 
 }
 ```
 
-**Other MVP files:** `classes.json` (starting stats, stat costs, spell unlock levels), `statuses.json`, `weapons.json`, `gems.json` (base rewards and default spawn weights) and `battles.json` (enemy, weight overrides, fixed seed for scripted fights).
+**Other MVP files:** `classes.json` (starting stats, stat costs, spell unlock levels), `statuses.json`, `weapons.json`, `gems.json` (base rewards and default spawn weights), `stats.json` (what one stat point is worth: HP per Vitality, damage per Might, mana and extra-turn chance per mastery point, resist chance per Cunning, and the cap on any chance) and `battles.json` (enemy, weight overrides, fixed seed for scripted fights).
 
 Numbers above are placeholders for the shape, not balance targets.
 
@@ -413,7 +413,7 @@ The open questions from the first draft were settled with their proposed default
 | Question | Decision |
 | --- | --- |
 | Who moves first | Higher Cunning; ties broken by the seed. No second-player compensation unless the balance runner shows a first-mover win rate above 55%. M0 showed about 60%, so the second mover now starts with 3 mana of each color (`second_mover_mana` in `gems.json`; see [M0 results](#m0-results)) |
-| Skull damage and Might | Start with a flat bonus per point of Might; tune with the balance runner in M0 |
+| Skull damage and Might | Start with a flat bonus per point of Might; tune with the balance runner in M0. Built in M1: each point adds `might_damage` to every skull match, skull bomb and weapon swing |
 | Swap after a non-ending spell | Allowed in the same turn |
 | Cost of a reshuffle | Mana penalty only; no lost turn |
 | Ghost row depth | 1 gem per column |

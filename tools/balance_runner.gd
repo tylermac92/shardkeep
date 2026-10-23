@@ -10,7 +10,7 @@ extends SceneTree
 ## --games is per matchup. A matchups file looks like DEFAULT_MATCHUPS: a default "level" and a
 ## list of matchups, each with a "name", two "loadouts" (classes.json ids or inline class
 ## entries) and optionally its own "level". In odd-numbered games the loadouts swap sides, so
-## each moves first half the time.
+## between equal Cunning neither always moves first (the seed breaks Cunning ties).
 ##
 ## Writes <out>/summary.csv (one row per matchup), <out>/<name>.csv (one row per battle) and
 ## <out>/<name>_extreme.json (the most extreme battle, for tools/replay.gd).
@@ -106,7 +106,8 @@ static func play_games(content: ContentLoader, spec: Dictionary, games: int, bas
 		for i in range(worker, games, jobs):
 			var order: Array = m.loadouts if i % 2 == 0 else [m.loadouts[1], m.loadouts[0]]
 			var r := play_battle(content, Streams.mix(base_seed, k, i), order, [level, level])
-			r["first"] = i % 2  # which of the matchup's loadouts moved first
+			r["side0"] = i % 2  # which of the matchup's loadouts played side 0
+			r["first"] = r.side0 ^ r.first_side  # and which moved first (Cunning, then the seed)
 			played[str(i)] = r
 		out[str(k)] = played
 	return out
@@ -173,7 +174,7 @@ static func play_battle(content: ContentLoader, battle_seed: int, loadouts: Arra
 	for l in loadouts:
 		weights.append(AI.weights_for(l if l is Dictionary else content.classes[l]))
 	var actions: Array[Action] = []
-	var stats := {"seed": battle_seed, "loadouts": loadouts, "actions": 0, "casts": 0, "reshuffles": 0, "longest_chain": 0}
+	var stats := {"seed": battle_seed, "loadouts": loadouts, "actions": 0, "casts": 0, "reshuffles": 0, "longest_chain": 0, "first_side": s.active_side}
 	var chain := 0
 	while s.result == BattleState.Result.ONGOING and stats.actions < MAX_ACTIONS:
 		var a := AI.choose(s, levels[s.active_side], weights[s.active_side])
@@ -204,7 +205,7 @@ static func play_battle(content: ContentLoader, battle_seed: int, loadouts: Arra
 static func summarize(m: Dictionary, level: AI.Level, battles: Array) -> Dictionary:
 	var n := battles.size()
 	var first_wins := 0  # the matchup's first loadout won
-	var mover_wins := 0  # side 0, the side that moved first, won
+	var mover_wins := 0  # the side that moved first won
 	var draws := 0
 	var turns := 0
 	var actions := 0
@@ -217,8 +218,8 @@ static func summarize(m: Dictionary, level: AI.Level, battles: Array) -> Diction
 		if b.winner < 0:
 			draws += 1
 		else:
-			mover_wins += int(b.winner == 0)
-			first_wins += int((b.winner == 0) == (b.first == 0))
+			mover_wins += int(b.winner == b.first_side)
+			first_wins += int((b.side0 ^ b.winner) == 0)
 		turns += b.turns
 		actions += b.actions
 		casts += b.casts

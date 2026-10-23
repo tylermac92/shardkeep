@@ -28,6 +28,7 @@ var panels: Array[SidePanel] = [SidePanel.new("You"), SidePanel.new("Enemy")]
 
 var _busy := true  # playing back, or the AI's turn: input does nothing
 var _battle := 0  # bumped per battle, so a restart drops the old battle's pending turn
+var _ai_tasks: Array[AITask] = []  # searches still running, joined if the screen closes mid-think
 var _seed_label := Label.new()
 var _message := Label.new()
 var _overlay := PanelContainer.new()
@@ -137,6 +138,15 @@ func export_replay() -> String:
 	return path
 
 
+func _exit_tree() -> void:
+	# Wait here, in ordinary code: freeing the screen frees its coroutines, and with them any
+	# search still running, which mustn't block (see AITask).
+	for task in _ai_tasks:
+		task.join()
+	_ai_tasks.clear()
+	AITask.join_orphans()
+
+
 func _unhandled_key_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if key and key.pressed and not key.echo and key.keycode == EXPORT_KEY and OS.is_debug_build():
@@ -206,9 +216,11 @@ func _ai_turn() -> void:
 	_message.text = "The enemy is thinking..."
 	var battle := _battle
 	var task := AITask.new(state, level, AI.weights_for(content.classes[loadouts[1]]), min_think_msec)
+	_ai_tasks.append(task)
 	while not task.is_ready():
 		await get_tree().process_frame
 	var action := task.poll()
+	_ai_tasks.erase(task)
 	if battle == _battle:
 		_act(action)
 

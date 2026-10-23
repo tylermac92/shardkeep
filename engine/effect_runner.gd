@@ -8,14 +8,15 @@ const MAX_SPELL_EXTRA_TURNS := 2
 
 
 ## Runs effects in order and stops if the battle ends. Returns whether an extra_turn op granted one.
-## Board changes aren't settled here; the caller runs the cascade afterwards.
-static func run(s: BattleState, effects: Array, owner: int, events: Array[Dictionary]) -> bool:
+## Board changes aren't settled here; the caller runs the cascade afterwards. damage_bonus is
+## added to each damage op aimed at the enemy (Might, for weapon swings).
+static func run(s: BattleState, effects: Array, owner: int, events: Array[Dictionary], damage_bonus := 0) -> bool:
 	var extra := false
 	for e: Dictionary in effects:
 		var target := owner if e.get("target", "self") == "self" else 1 - owner
 		match e.op:
 			"damage":
-				Rules.damage(s, target, int(e.amount), events)
+				Rules.damage(s, target, int(e.amount) + (damage_bonus if target != owner else 0), events)
 			"damage_per_gem":
 				var n := s.board.gems.count(ContentLoader.GEM_IDS.find(e.gem))
 				Rules.damage(s, target, n * int(e.per), events)
@@ -24,7 +25,7 @@ static func run(s: BattleState, effects: Array, owner: int, events: Array[Dictio
 			"convert_gems":
 				_convert(s, ContentLoader.GEM_IDS.find(e.from), ContentLoader.GEM_IDS.find(e.to), e.count, events)
 			"apply_status":
-				apply_status(s, target, e.status, int(e.turns), int(e.get("stacks", 1)), events)
+				apply_status(s, target, e.status, int(e.turns), int(e.get("stacks", 1)), events, target != owner)
 			"extra_turn":
 				if s.extra_turn_chain < MAX_SPELL_EXTRA_TURNS:
 					s.extra_turn_chain += 1
@@ -37,11 +38,17 @@ static func run(s: BattleState, effects: Array, owner: int, events: Array[Dictio
 
 
 ## Adds a status, or refreshes it (longest duration, stacks add up). Stun is blocked on a side
-## that was stunned on its previous turn.
-static func apply_status(s: BattleState, target: int, id: String, turns: int, stacks: int, events: Array[Dictionary]) -> void:
+## that was stunned on its previous turn. A resistible status from the enemy (from_enemy) can
+## be resisted with Cunning.
+static func apply_status(s: BattleState, target: int, id: String, turns: int, stacks: int, events: Array[Dictionary], from_enemy := false) -> void:
 	var side := s.sides[target]
-	if s.content.statuses[id].get("skips_turn", false) and side.stunned_last_turn:
+	var def: Dictionary = s.content.statuses[id]
+	if def.get("skips_turn", false) and side.stunned_last_turn:
 		events.append({type = "status_blocked", side = target, status = id})
+		return
+	if from_enemy and def.get("resistible", false) \
+			and Rules.roll(s, side.stats[SideState.Stat.CUNNING] * int(s.content.stat_rules.get("cunning_resist_percent", 0))):
+		events.append({type = "status_resisted", side = target, status = id})
 		return
 	for st in side.statuses:
 		if st.id == id:
