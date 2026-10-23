@@ -15,6 +15,8 @@ var gem_weights := PackedInt32Array()
 var gem_defs: Array = []
 ## Bonus damage when a SKULL_BOMB goes off.
 var skull_bomb_damage := 0
+## Mana of each color the side that moves second starts with, against the first-mover edge.
+var second_mover_mana := 0
 ## Definitions by id, straight from spells.json, weapons.json, statuses.json and classes.json.
 var spells := {}
 var weapons := {}
@@ -30,6 +32,7 @@ func load_all(dir: String = CONTENT_DIR) -> PackedStringArray:
 	if data is Dictionary and data.get("gems") is Array:
 		gems = data["gems"]
 		skull_bomb_damage = int(data.get("skull_bomb_damage", 0))
+		second_mover_mana = int(data.get("second_mover_mana", 0))
 		gem_weights.resize(GEM_IDS.size())
 		gem_weights.fill(0)
 		gem_defs.resize(GEM_IDS.size())

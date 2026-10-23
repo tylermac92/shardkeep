@@ -1,5 +1,6 @@
 {
   "skull_bomb_damage": 5,
+  "second_mover_mana": 3,
   "gems": [
     { "id": "red", "spawn_weight": 16, "reward": "mana", "amount": 1 },
     { "id": "blue", "spawn_weight": 16, "reward": "mana", "amount": 1 },

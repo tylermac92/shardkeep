@@ -29,6 +29,8 @@ static func new_battle(battle_seed: int, content: ContentLoader, loadouts: Array
 			side.spells.append(StringName(spell))
 		side.cooldowns.resize(side.spells.size())
 		side.weapon = StringName(def.weapon)
+	for color in MANA_KINDS.size():  # side 0 moves first; side 1 gets the head start
+		s.sides[1].mana[color] = mini(content.second_mover_mana, s.sides[1].mana_cap[color])
 	_fill_board(s, false)
 	return s
 

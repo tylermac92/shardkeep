@@ -321,19 +321,88 @@ M0 answers two questions before any content work: is a battle on the shared boar
 
 **Acceptance criteria**
 
-- [ ] 8×8 board renders with distinct placeholder shapes per gem; click-to-swap and drag-to-swap both work, and illegal swaps snap back
-- [ ] Full turn pipeline: matches (including `WILD` across two colors), all special gems, cascades, mid-cascade KO, extra turns with the chain cap, reshuffle before any action with no legal swap
-- [ ] Ghost row shows the next gem in each column
-- [ ] Player vs Easy and Normal AI, 2 spells and a weapon per side, HP and mana bars, win and loss screens
-- [ ] Animation speed toggle (1×, 2×, instant)
-- [ ] Battle seed shown on screen; a debug key exports seed plus action list, and `replay.gd` reproduces the battle to the same state hash
-- [ ] At least 30 GUT tests, including golden boards for every group shape, and 3 replay fixtures
-- [ ] Fuzz test runs 10,000 turns with zero invariant failures
-- [ ] Balance runner completes 1,000 Easy-vs-Easy battles headless and writes the CSV, including first-mover win rate
+- [x] 8×8 board renders with distinct placeholder shapes per gem; click-to-swap and drag-to-swap both work, and illegal swaps snap back
+- [x] Full turn pipeline: matches (including `WILD` across two colors), all special gems, cascades, mid-cascade KO, extra turns with the chain cap, reshuffle before any action with no legal swap
+- [x] Ghost row shows the next gem in each column
+- [x] Player vs Easy and Normal AI, 2 spells and a weapon per side, HP and mana bars, win and loss screens
+- [x] Animation speed toggle (1×, 2×, instant)
+- [x] Battle seed shown on screen; a debug key exports seed plus action list, and `replay.gd` reproduces the battle to the same state hash
+- [x] At least 30 GUT tests, including golden boards for every group shape, and 3 replay fixtures
+- [x] Fuzz test runs 10,000 turns with zero invariant failures
+- [x] Balance runner completes 1,000 Easy-vs-Easy battles headless and writes the CSV, including first-mover win rate
 - [ ] Measured and recorded in this doc: average `apply()` time, plus Normal and Hard AI decision times (Hard as a benchmark only, not yet playable), on a desktop PC and the slowest target machine
 - [ ] Fun check: 30 battles played by you, with short notes on what felt good and what felt bad
 
 **Exit decision.** If the fun check is positive and the Hard benchmark fits its 250 ms budget, move on to M1 (classes, levels 1–10, the full status set, playable Hard AI). If Hard misses budget even with a smaller beam, port the engine to C# before M1. If the battles aren't fun, tune board rules (gem weights, skull damage, extra-turn rules) and repeat the fun check before adding content.
+
+## M0 results
+
+Recorded Oct 22, 2026. Rows marked *to measure* need your machines or your play; the exit decision waits on them.
+
+### Speed
+
+`godot --headless --script res://tools/benchmark.gd` (200 positions, decision times in ms, average / worst):
+
+| Machine | `apply()` | Easy | Normal | Hard, beam 6 | Hard, beam 4 | Hard, beam 3 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Cloud sandbox: Xeon 2.1 GHz, 4 cores, Godot 4.7.2 editor build | 0.72 | 14 / 124 | 119 / 991 | 316 / 965 | 171 / 454 | 101 / 310 |
+| Desktop PC | *to measure* | | | | | |
+| Slowest target (Steam Deck) | *to measure* | | | | | |
+
+The beam is `AI.BEAM` in `engine/ai.gd` (6 today). Hard at beam 6 misses the 250 ms budget on the sandbox; beam 4 fits it on average but not in the worst case. A T10 change to swap checks cut Hard from 951 ms to 316 ms with identical results, so profiling found real headroom before any port.
+
+GDScript threads in one process slow each other down in this build (four threads took about 3x longer than the same work run one after another), so the balance runner uses one process per core. The battle screen runs the AI on a single worker thread and isn't affected.
+
+### First mover
+
+Mirror matches, first-mover win rate:
+
+| Run | A vs A | B vs B |
+| --- | --- | --- |
+| Easy, 1,000 games each, no head start | 60.5% | 59.1% |
+| Easy, 500 games each, second mover starts with 3 mana per color | 47.4% | 51.2% |
+| Easy, 500 games each, 6 mana per color | 38.4% | 51.6% |
+| Easy, 1,000 games each, 3 mana (adopted) | 50.5% | 51.2% |
+| Normal, 200 games each, 3 mana | 50.5% | 56.5% |
+
+The head start is adopted at 3. Normal's B mirror is just over 55%, but at 200 games the margin is about ±3.5 points; re-check it with more games once the loadouts are tuned.
+
+### Balance
+
+`tools/balance_runner.gd`, all matchups, with the head start:
+
+| Level | Matchup | A wins | First mover wins | Avg turns | Longest extra-turn chain | Spell casts | Reshuffles per battle |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Easy (1,000 games) | A vs B | 88.3% | 48.1% | 35.4 | 8 | 19.3% | 0.12 |
+| Easy (1,000 games) | A vs A | 50.7% | 50.5% | 25.6 | 8 | 21.0% | 0.06 |
+| Easy (1,000 games) | B vs B | 49.8% | 51.2% | 69.8 | 9 | 14.5% | 0.66 |
+| Normal (200 games) | A vs B | 94.0% | 52.0% | 42.2 | 7 | 17.0% | 0.28 |
+| Normal (200 games) | A vs A | 52.5% | 50.5% | 33.2 | 7 | 18.4% | 0.18 |
+| Normal (200 games) | B vs B | 49.5% | 56.5% | 76.4 | 7 | 13.4% | 0.99 |
+
+Flags to tune before content work:
+
+- **Loadout A beats B** 88% (Easy) to 94% (Normal). Likely cause, not yet measured: Firebolt deals 1 damage per red gem on the board (about 9 for 7 mana), while B's Stone Barrier and Concussion mostly defend or deal 3.
+- **B mirrors run 70 to 76 turns** (target 15 to 40), likely for the same reason: B has little direct damage.
+- **Extra-turn chains reach 7 to 9** (flag above 6). The cap of 2 only covers spell-granted extra turns; 4-matches can chain without limit.
+
+The two loadouts are placeholders, so these are tuning inputs for M1's real classes rather than board-rule failures.
+
+### Fun check
+
+*To do:* 30 battles across both loadouts and both difficulties, with one line on what felt good and one on what felt bad after each. The win and loss screen saves the notes; [fun_check.md](fun_check.md) has the template and where the file lands.
+
+Three most common complaints: *to fill in after the fun check.*
+
+### Exit decision
+
+*Pending* the fun check and the target-machine benchmark.
+
+- [ ] Move to M1
+- [ ] Port the engine to C#
+- [ ] Tune board rules and repeat the fun check
+
+Provisional reading of the data so far: no C# port yet. The design's rule is to shrink the beam first, and beam 4 already fits 250 ms on average on the sandbox; if the Steam Deck confirms that, set `AI.BEAM` to 4. Whether to move to M1 or tune board rules first depends on the fun check.
 
 ## Decisions
 
@@ -341,7 +410,7 @@ The open questions from the first draft were settled with their proposed default
 
 | Question | Decision |
 | --- | --- |
-| Who moves first | Higher Cunning; ties broken by the seed. No second-player compensation unless the balance runner shows a first-mover win rate above 55% |
+| Who moves first | Higher Cunning; ties broken by the seed. No second-player compensation unless the balance runner shows a first-mover win rate above 55%. M0 showed about 60%, so the second mover now starts with 3 mana of each color (`second_mover_mana` in `gems.json`; see [M0 results](#m0-results)) |
 | Skull damage and Might | Start with a flat bonus per point of Might; tune with the balance runner in M0 |
 | Swap after a non-ending spell | Allowed in the same turn |
 | Cost of a reshuffle | Mana penalty only; no lost turn |
